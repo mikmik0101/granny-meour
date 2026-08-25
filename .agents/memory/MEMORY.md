@@ -1,0 +1,1 @@
+- [Catalog image storage](object-storage-catalog.md) — product photos use authenticated presigned uploads and persistent object paths.

@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: catalog
+    description: Public crochet catalog
+  - name: admin
+    description: Admin catalog management
 paths:
   /healthz:
     get:
@@ -24,6 +28,207 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /products:
+    get:
+      operationId: listProducts
+      tags: [catalog]
+      summary: List publicly visible products
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [newest, price-low, price-high, name]
+      responses:
+        "200":
+          description: Products
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Product" }
+    post:
+      operationId: createProduct
+      tags: [admin]
+      summary: Create a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [catalog]
+      summary: Get a product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404": { description: Not found }
+    patch:
+      operationId: updateProduct
+      tags: [admin]
+      summary: Update a product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+    delete:
+      operationId: deleteProduct
+      tags: [admin]
+      summary: Delete a product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      responses:
+        "204": { description: Deleted }
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [catalog]
+      summary: List categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Category" }
+    post:
+      operationId: createCategory
+      tags: [admin]
+      summary: Create a category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CategoryInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+  /categories/{id}:
+    patch:
+      operationId: updateCategory
+      tags: [admin]
+      summary: Rename a category
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CategoryInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+    delete:
+      operationId: deleteCategory
+      tags: [admin]
+      summary: Delete a category
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: number }
+      responses:
+        "204": { description: Deleted }
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [catalog]
+      summary: Get public website settings
+      responses:
+        "200":
+          description: Website settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SiteSettings" }
+    patch:
+      operationId: updateSettings
+      tags: [admin]
+      summary: Update website settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SiteSettingsUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SiteSettings" }
+  /admin/dashboard:
+    get:
+      operationId: getDashboard
+      tags: [admin]
+      summary: Get admin dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DashboardSummary" }
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [admin]
+      summary: Request a direct image upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UploadRequest" }
+      responses:
+        "200":
+          description: Upload URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadResponse" }
 components:
   schemas:
     HealthStatus:
@@ -33,4 +238,125 @@ components:
           type: string
       required:
         - status
+    Product:
+      type: object
+      required: [id, name, description, price, category, image, status, featured, colors, variants, notes, createdAt, updatedAt]
+      properties:
+        id: { type: number }
+        name: { type: string }
+        description: { type: string }
+        price: { type: number }
+        category: { type: string }
+        image: { type: string }
+        additionalImages:
+          type: array
+          items: { type: string }
+        status:
+          type: string
+          enum: [available, sold-out, coming-soon, hidden]
+        featured: { type: boolean }
+        colors:
+          type: array
+          items: { type: string }
+        variants:
+          type: array
+          items: { type: string }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    ProductInput:
+      type: object
+      required: [name, description, price, category, image]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string, minLength: 1 }
+        price: { type: number, minimum: 0 }
+        category: { type: string, minLength: 1 }
+        image: { type: string, minLength: 1 }
+        additionalImages:
+          type: array
+          items: { type: string }
+        status:
+          type: string
+          enum: [available, sold-out, coming-soon, hidden]
+        featured: { type: boolean }
+        colors:
+          type: array
+          items: { type: string }
+        variants:
+          type: array
+          items: { type: string }
+        notes: { type: ["string", "null"] }
+    ProductUpdate:
+      allOf:
+        - $ref: "#/components/schemas/ProductInput"
+    Category:
+      type: object
+      required: [id, name, productCount]
+      properties:
+        id: { type: number }
+        name: { type: string }
+        productCount: { type: number }
+    CategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+    ContactMethod:
+      type: object
+      required: [id, platform, label, description, value, enabled]
+      properties:
+        id: { type: string }
+        platform: { type: string }
+        label: { type: string }
+        description: { type: string }
+        value: { type: string }
+        enabled: { type: boolean }
+    SiteSettings:
+      type: object
+      required: [brandName, heroTitle, heroSubtitle, heroDescription, aboutTitle, aboutContent, contactMethods]
+      properties:
+        brandName: { type: string }
+        logo: { type: ["string", "null"] }
+        heroTitle: { type: string }
+        heroSubtitle: { type: string }
+        heroDescription: { type: string }
+        aboutTitle: { type: string }
+        aboutContent: { type: string }
+        contactMethods:
+          type: array
+          items: { $ref: "#/components/schemas/ContactMethod" }
+    SiteSettingsUpdate:
+      allOf:
+        - $ref: "#/components/schemas/SiteSettings"
+    DashboardSummary:
+      type: object
+      required: [totalProducts, availableProducts, soldOutProducts, hiddenProducts, featuredProducts, totalCategories]
+      properties:
+        totalProducts: { type: number }
+        availableProducts: { type: number }
+        soldOutProducts: { type: number }
+        hiddenProducts: { type: number }
+        featuredProducts: { type: number }
+        totalCategories: { type: number }
+    UploadRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string }
+        size: { type: number }
+        contentType: { type: string }
+    UploadResponse:
+      type: object
+      required: [uploadURL, objectPath, metadata]
+      properties:
+        uploadURL: { type: string }
+        objectPath: { type: string }
+        metadata:
+          type: object
+          required: [name, size, contentType]
+          properties:
+            name: { type: string }
+            size: { type: number }
+            contentType: { type: string }
 
