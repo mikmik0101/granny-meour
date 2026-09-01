@@ -4,6 +4,7 @@ import {
   RequestUploadUrlResponse,
 } from '@workspace/api-zod';
 import { Router, type IRouter, type Request, type Response } from 'express';
+import { clerkClient } from '@clerk/express';
 
 import { ObjectPermission } from '../lib/objectAcl';
 import {
@@ -26,8 +27,14 @@ router.post(
   '/storage/uploads/request-url',
   async (req: Request, res: Response) => {
     const authReq = req as Request & { auth?: () => { userId?: string | null } };
-    if (typeof authReq.auth !== 'function' || !authReq.auth().userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+    const userId = typeof authReq.auth === 'function' ? authReq.auth().userId : null;
+    const allowedEmail = process.env.CROCHET_ADMIN_EMAIL?.trim().toLowerCase();
+    const user = userId && allowedEmail ? await clerkClient.users.getUser(userId) : null;
+    const primaryEmail = user?.emailAddresses.find(
+      (email) => email.id === user.primaryEmailAddressId,
+    )?.emailAddress.trim().toLowerCase();
+    if (!userId || !allowedEmail || primaryEmail !== allowedEmail) {
+      res.status(403).json({ error: 'Admin access required' });
 
       return;
     }

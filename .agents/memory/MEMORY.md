@@ -1,1 +1,2 @@
 - [Catalog image storage](object-storage-catalog.md) — product photos use authenticated presigned uploads and persistent object paths.
+- [Single-admin access policy](admin-access-policy.md) — only the configured Clerk primary email can enter or mutate the admin area.

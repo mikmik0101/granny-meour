@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
@@ -190,8 +190,22 @@ function AdminShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { isLoaded, isSignedIn } = useAuth();
   const { signOut } = useClerk();
+  const [access, setAccess] = useState<'checking' | 'allowed' | 'denied'>('checking');
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    let active = true;
+    fetch('/api/admin/access')
+      .then((response) => active && setAccess(response.ok ? 'allowed' : 'denied'))
+      .catch(() => active && setAccess('denied'));
+    return () => { active = false; };
+  }, [isLoaded, isSignedIn]);
+  useEffect(() => {
+    if (access === 'denied') signOut({ redirectUrl: `${import.meta.env.BASE_URL}admin/login` });
+  }, [access, signOut]);
   if (!isLoaded) return <div className="min-h-[100dvh] bg-background" />;
   if (!isSignedIn) { setLocation('/admin/login'); return null; }
+  if (access === 'checking') return <div className="flex min-h-[100dvh] items-center justify-center bg-background text-sm text-muted-foreground">Checking studio access…</div>;
+  if (access === 'denied') return <div className="flex min-h-[100dvh] items-center justify-center bg-background text-sm text-muted-foreground">This account is not authorized for studio access.</div>;
   function logout() { signOut({ redirectUrl: `${import.meta.env.BASE_URL}` }); }
   return <div className="min-h-[100dvh] bg-background text-foreground md:flex"><aside className={`fixed inset-y-0 left-0 z-40 w-72 transform bg-sidebar p-6 text-sidebar-foreground transition-transform md:relative md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}><div className="flex items-center justify-between"><BrandMark settings={fallbackSettings} dark /><button className="rounded-full p-2 md:hidden" onClick={() => setOpen(false)} data-testid="button-close-admin-menu"><X size={18} /></button></div><p className="mono-label mt-14 opacity-45">Your worktable</p><nav className="mt-4 grid gap-1">{adminLinks.map(([href, label, Icon]) => { const active = href === '/admin' ? location === href : location.startsWith(href); return <Link href={href} onClick={() => setOpen(false)} key={href} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors ${active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground'}`} data-testid={`link-admin-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={17} />{label}</Link>; })}</nav><div className="absolute bottom-6 left-6 right-6 border-t border-sidebar-border pt-5"><Link href="/" className="flex items-center gap-3 px-3 py-2 text-sm text-sidebar-foreground/65 hover:text-sidebar-foreground" data-testid="link-view-shop"><Eye size={17} /> View shop</Link><button onClick={logout} className="mt-2 flex w-full items-center gap-3 px-3 py-2 text-sm text-sidebar-foreground/65 hover:text-sidebar-foreground" data-testid="button-admin-logout"><ArrowRight size={17} /> Sign out</button></div></aside>{open && <button className="fixed inset-0 z-30 bg-primary/30 md:hidden" onClick={() => setOpen(false)} aria-label="Close navigation" data-testid="button-admin-overlay" />}<div className="min-w-0 flex-1"><header className="flex items-center justify-between border-b border-border px-5 py-4 md:px-10"><button onClick={() => setOpen(true)} className="rounded-full p-2 md:hidden" data-testid="button-open-admin-menu"><Menu size={20} /></button><div className="hidden md:block"><p className="eyebrow">Purl & Petal / studio</p><p className="mt-1 text-sm text-muted-foreground">A tidy place for your lovely things.</p></div><Link href="/" className="text-sm font-semibold md:hidden" data-testid="link-admin-mobile-brand">Purl & Petal</Link><div className="flex items-center gap-3"><span className="hidden text-xs text-muted-foreground sm:block">Studio owner</span><span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-xs font-bold">PP</span></div></header><main className="mx-auto max-w-[1400px] p-5 md:p-10">{children}</main></div></div>;
 }

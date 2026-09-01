@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
+import { clerkClient } from "@clerk/express";
 import {
   CreateCategoryBody,
   CreateProductBody,
@@ -26,15 +27,29 @@ import {
 
 const router: IRouter = Router();
 
-function requireAdmin(req: Request, res: Response): boolean {
+async function requireAdmin(req: Request, res: Response): Promise<boolean> {
   const authReq = req as Request & { auth?: () => { userId?: string | null } };
   const userId = typeof authReq.auth === "function" ? authReq.auth().userId : null;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
+  const allowedEmail = process.env.CROCHET_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!userId || !allowedEmail) {
+    res.status(403).json({ error: "Admin access required" });
+    return false;
+  }
+  const user = await clerkClient.users.getUser(userId);
+  const primaryEmail = user.emailAddresses.find(
+    (email) => email.id === user.primaryEmailAddressId,
+  )?.emailAddress.trim().toLowerCase();
+  if (primaryEmail !== allowedEmail) {
+    res.status(403).json({ error: "Admin access required" });
     return false;
   }
   return true;
 }
+
+router.get("/admin/access", async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  res.json({ allowed: true });
+});
 
 const fallbackSettings = {
   brandName: "Loop & Petal",
@@ -179,7 +194,7 @@ router.get("/products/:id", async (req, res) => {
 });
 
 router.post("/products", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const data = CreateProductBody.parse(req.body);
   const rows = await db.insert(productsTable).values({
     ...data,
@@ -195,7 +210,7 @@ router.post("/products", async (req, res) => {
 });
 
 router.patch("/products/:id", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const { id } = UpdateProductParams.parse({ id: Number(req.params.id) });
   const data = UpdateProductBody.parse(req.body);
   const rows = await db.update(productsTable).set({
@@ -209,7 +224,7 @@ router.patch("/products/:id", async (req, res) => {
 });
 
 router.delete("/products/:id", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   await db.delete(productsTable).where(eq(productsTable.id, Number(req.params.id)));
   res.status(204).send();
 });
@@ -225,14 +240,14 @@ router.get("/categories", async (_req, res) => {
 });
 
 router.post("/categories", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const data = CreateCategoryBody.parse(req.body);
   const rows = await db.insert(categoriesTable).values(data).returning();
   res.status(201).json({ ...rows[0], productCount: 0 });
 });
 
 router.patch("/categories/:id", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const { id } = UpdateCategoryParams.parse({ id: Number(req.params.id) });
   const data = UpdateCategoryBody.parse(req.body);
   const current = await db.select().from(categoriesTable).where(eq(categoriesTable.id, id)).limit(1);
@@ -243,7 +258,7 @@ router.patch("/categories/:id", async (req, res) => {
 });
 
 router.delete("/categories/:id", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const current = await db.select().from(categoriesTable).where(eq(categoriesTable.id, Number(req.params.id))).limit(1);
   if (current[0]) {
     const count = await db.select({ count: sql<number>`count(*)::int` }).from(productsTable).where(eq(productsTable.category, current[0].name));
@@ -258,7 +273,7 @@ router.get("/settings", async (_req, res) => {
 });
 
 router.patch("/settings", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const data = UpdateSettingsBody.parse(req.body);
   await ensureSeeded();
   const existing = await db.select({ id: settingsTable.id }).from(settingsTable).limit(1);
