@@ -42,8 +42,9 @@ const fallbackSettings: SettingsLike = {
   aboutTitle: 'Made by hand, meant to be held.',
   aboutContent: 'Granny Meour is a one-person crochet studio making useful, whimsical things for warm homes and thoughtful gifting. Every piece is stitched in small batches, with a little room for the yarn to surprise me.',
   contactMethods: [
-    { id: 'instagram', platform: 'instagram', label: 'Instagram', description: 'See what is on the hook', value: '@purlandpetal', enabled: true },
-    { id: 'email', platform: 'email', label: 'Email', description: 'Ask about a piece or a custom colour', value: 'hello@purlandpetal.com', enabled: true },
+    { id: 'facebook', platform: 'facebook', label: 'Facebook', description: 'Find me on Facebook', value: 'https://www.facebook.com/michaelalyka.cullamat', enabled: true },
+    { id: 'instagram', platform: 'instagram', label: 'Instagram', description: 'Follow for handmade crochet', value: 'https://www.instagram.com/meour__?igsi=ZDNlZDc0MzIxNw==', enabled: true },
+    { id: 'email', platform: 'email', label: 'Email', description: 'Send me a message', value: 'michacullamat@gmail.com', enabled: true },
   ],
 };
 
