@@ -2,14 +2,20 @@
   "version": 2,
   "builds": [
     {
-      "src": "artifacts/api-server/build.mjs",
+      "src": "artifacts/api-server/package.json",
       "use": "@vercel/node",
-      "config": { "distDir": "artifacts/api-server/dist" }
+      "config": {
+        "distDir": "artifacts/api-server/dist",
+        "buildCommand": "node ./build.mjs"
+      }
     },
     {
-      "src": "artifacts/crochet-boutique/vite.config.ts",
+      "src": "artifacts/crochet-boutique/package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "artifacts/crochet-boutique/dist/public" }
+      "config": {
+        "distDir": "dist/public",
+        "buildCommand": "PORT=3000 BASE_PATH=/ npx vite build --config vite.config.ts"
+      }
     }
   ],
   "routes": [
@@ -24,6 +30,7 @@
   ],
   "env": {
     "NODE_ENV": "production",
-    "PORT": "3000"
+    "PORT": "3000",
+    "BASE_PATH": "/"
   }
 }
