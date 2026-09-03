@@ -13,7 +13,7 @@
       "src": "artifacts/crochet-boutique/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist/public",
+        "distDir": "artifacts/crochet-boutique/dist/public",
         "buildCommand": "PORT=3000 BASE_PATH=/ npx vite build --config vite.config.ts"
       }
     }
