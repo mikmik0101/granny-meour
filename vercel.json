@@ -1,37 +1,9 @@
 {
   "version": 2,
-  "installCommand": "npx pnpm@11.25.0 install --frozen-lockfile",
-  "builds": [
-    {
-      "src": "artifacts/api-server/package.json",
-      "use": "@vercel/node",
-      "config": {
-        "distDir": "artifacts/api-server/dist",
-        "buildCommand": "node ./build.mjs"
-      }
-    },
-    {
-      "src": "artifacts/crochet-boutique/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "artifacts/crochet-boutique/dist/public",
-        "buildCommand": "PORT=3000 BASE_PATH=/ npx vite build --config vite.config.ts"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/artifacts/api-server/dist/index.mjs"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/artifacts/crochet-boutique/dist/public/$1"
-    }
-  ],
+  "buildCommand": "vite build",
+  "outputDirectory": "dist/public",
   "env": {
     "NODE_ENV": "production",
-    "PORT": "3000",
     "BASE_PATH": "/"
   }
 }
