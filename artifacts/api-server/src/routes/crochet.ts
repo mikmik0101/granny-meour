@@ -52,7 +52,7 @@ router.get("/admin/access", async (req, res) => {
 });
 
 const fallbackSettings = {
-  brandName: "Loop & Petal",
+  brandName: "Granny Meour",
   logo: null,
   heroTitle: "Handmade with love",
   heroSubtitle: "Little crochet creations, made one stitch at a time.",

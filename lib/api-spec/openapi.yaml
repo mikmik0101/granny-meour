@@ -229,6 +229,56 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadResponse" }
+  /storage/upload:
+    post:
+      operationId: uploadImage
+      tags: [admin]
+      summary: Upload an image file to Cloudinary
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Uploaded image info
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadImageResponse" }
+        "400":
+          description: Invalid file
+        "403":
+          description: Admin access required
+        "500":
+          description: Upload failed
+  /storage/image/{publicId}:
+    delete:
+      operationId: deleteImage
+      tags: [admin]
+      summary: Delete an image from Cloudinary
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        "400":
+          description: Invalid public ID
+        "403":
+          description: Admin access required
+        "500":
+          description: Delete failed
 components:
   schemas:
     HealthStatus:
@@ -359,4 +409,13 @@ components:
             name: { type: string }
             size: { type: number }
             contentType: { type: string }
-
+    UploadImageResponse:
+      type: object
+      required: [url, publicId]
+      properties:
+        url:
+          type: string
+          description: Secure HTTPS URL of the uploaded image
+        publicId:
+          type: string
+          description: Cloudinary public ID for the uploaded image

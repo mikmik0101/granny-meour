@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "artifacts/api-server/build.mjs",
+      "use": "@vercel/node",
+      "config": { "distDir": "artifacts/api-server/dist" }
+    },
+    {
+      "src": "artifacts/crochet-boutique/vite.config.ts",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "artifacts/crochet-boutique/dist/public" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/artifacts/api-server/dist/index.mjs"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/artifacts/crochet-boutique/dist/public/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "3000"
+  }
+}

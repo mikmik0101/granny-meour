@@ -23,6 +23,7 @@ import type {
   Category,
   CategoryInput,
   DashboardSummary,
+  DeleteImage200,
   HealthStatus,
   ListProductsParams,
   Product,
@@ -30,6 +31,7 @@ import type {
   ProductUpdate,
   SiteSettings,
   SiteSettingsUpdate,
+  UploadImageResponse,
   UploadRequest,
   UploadResponse
 } from './api.schemas';
@@ -1099,5 +1101,147 @@ export const useRequestUploadUrl = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRequestUploadUrlMutationOptions(options));
+    }
+
+export const getUploadImageUrl = () => {
+
+
+
+
+  return `/api/storage/upload`
+}
+
+/**
+ * @summary Upload an image file to Cloudinary
+ */
+export const uploadImage = async (uploadImageBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<UploadImageResponse> => {
+
+  return customFetch<UploadImageResponse>(getUploadImageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...options?.headers },
+    body: uploadImageBody
+  }
+);}
+
+
+
+
+
+export const getUploadImageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadImage>>, TError,{data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadImage>>, TError,{data: BodyType<Blob>}, TContext> => {
+
+const mutationKey = ['uploadImage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadImage>>, {data: BodyType<Blob>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadImage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadImageMutationResult = NonNullable<Awaited<ReturnType<typeof uploadImage>>>
+    export type UploadImageMutationBody = BodyType<Blob>
+    export type UploadImageMutationError = ErrorType<void>
+
+    /**
+ * @summary Upload an image file to Cloudinary
+ */
+export const useUploadImage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadImage>>, TError,{data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadImage>>,
+        TError,
+        {data: BodyType<Blob>},
+        TContext
+      > => {
+      return useMutation(getUploadImageMutationOptions(options));
+    }
+
+export const getDeleteImageUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/storage/image/${publicId}`
+}
+
+/**
+ * @summary Delete an image from Cloudinary
+ */
+export const deleteImage = async (publicId: string, options?: Parameters<typeof customFetch>[1]): Promise<DeleteImage200> => {
+
+  return customFetch<DeleteImage200>(getDeleteImageUrl(publicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteImageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteImage>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteImage>>, TError,{publicId: string}, TContext> => {
+
+const mutationKey = ['deleteImage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteImage>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
+
+          return  deleteImage(publicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteImageMutationResult = NonNullable<Awaited<ReturnType<typeof deleteImage>>>
+
+    export type DeleteImageMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete an image from Cloudinary
+ */
+export const useDeleteImage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteImage>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteImage>>,
+        TError,
+        {publicId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteImageMutationOptions(options));
     }
 

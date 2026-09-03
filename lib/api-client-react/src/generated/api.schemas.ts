@@ -130,6 +130,13 @@ export interface UploadResponse {
   metadata: UploadResponseMetadata;
 }
 
+export interface UploadImageResponse {
+  /** Secure HTTPS URL of the uploaded image */
+  url: string;
+  /** Cloudinary public ID for the uploaded image */
+  publicId: string;
+}
+
 export type ListProductsParams = {
 search?: string;
 category?: string;
@@ -145,4 +152,8 @@ export const ListProductsSort = {
   'price-high': 'price-high',
   name: 'name',
 } as const;
+
+export type DeleteImage200 = {
+  success?: boolean;
+};
 

@@ -1,28 +1,30 @@
-import { Readable } from 'stream';
-import {
-  RequestUploadUrlBody,
-  RequestUploadUrlResponse,
-} from '@workspace/api-zod';
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { clerkClient } from '@clerk/express';
+import { RequestUploadUrlBody, RequestUploadUrlResponse } from '@workspace/api-zod';
 
-import { ObjectPermission } from '../lib/objectAcl';
-import {
-  ObjectNotFoundError,
-  ObjectStorageService,
-} from '../lib/objectStorage';
+import { uploadImage, deleteImage, CloudinaryError } from '../lib/cloudinary';
 
 const router: IRouter = Router();
-const objectStorageService = new ObjectStorageService();
 
-/**
- * POST /storage/uploads/request-url
- *
- * Request a presigned URL for file upload.
- * The client sends JSON metadata (name, size, contentType) — NOT the file.
- * Then uploads the file directly to the returned presigned URL.
- * Requires auth middleware so public callers cannot mint write-capable URLs.
- */
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+];
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+function validateImageFile(file: { name: string; size: number; contentType: string }): string | null {
+  if (!ALLOWED_MIME_TYPES.includes(file.contentType)) {
+    return `Unsupported file type: ${file.contentType}. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}`;
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return `File too large: ${file.size} bytes. Maximum: ${MAX_FILE_SIZE} bytes`;
+  }
+  return null;
+}
+
 router.post(
   '/storage/uploads/request-url',
   async (req: Request, res: Response) => {
@@ -35,7 +37,6 @@ router.post(
     )?.emailAddress.trim().toLowerCase();
     if (!userId || !allowedEmail || primaryEmail !== allowedEmail) {
       res.status(403).json({ error: 'Admin access required' });
-
       return;
     }
 
@@ -45,118 +46,115 @@ router.post(
       return;
     }
 
+    const validationError = validateImageFile(parsed.data);
+    if (validationError) {
+      res.status(400).json({ error: validationError });
+      return;
+    }
+
     try {
-      const { name, size, contentType } = parsed.data;
-
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      const objectPath =
-        objectStorageService.normalizeObjectEntityPath(uploadURL);
-
       res.json(
         RequestUploadUrlResponse.parse({
-          uploadURL,
-          objectPath,
-          metadata: { name, size, contentType },
+          uploadURL: '/api/storage/upload',
+          objectPath: `/objects/${Date.now()}-${parsed.data.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`,
+          metadata: { name: parsed.data.name, size: parsed.data.size, contentType: parsed.data.contentType },
         }),
       );
     } catch (error) {
-      req.log.error({ err: error }, 'Error generating upload URL');
-      res.status(500).json({ error: 'Failed to generate upload URL' });
+      req.log.error({ err: error }, 'Error generating upload response');
+      res.status(500).json({ error: 'Failed to generate upload response' });
     }
   },
 );
 
-/**
- * GET /storage/public-objects/*
- *
- * Serve public assets from PUBLIC_OBJECT_SEARCH_PATHS.
- * These are unconditionally public — no authentication or ACL checks.
- * IMPORTANT: Always provide this endpoint when object storage is set up.
- */
-router.get(
-  '/storage/public-objects/*filePath',
+router.post(
+  '/storage/upload',
   async (req: Request, res: Response) => {
+    const authReq = req as Request & { auth?: () => { userId?: string | null } };
+    const userId = typeof authReq.auth === 'function' ? authReq.auth().userId : null;
+    const allowedEmail = process.env.CROCHET_ADMIN_EMAIL?.trim().toLowerCase();
+    const user = userId && allowedEmail ? await clerkClient.users.getUser(userId) : null;
+    const primaryEmail = user?.emailAddresses.find(
+      (email) => email.id === user.primaryEmailAddressId,
+    )?.emailAddress.trim().toLowerCase();
+    if (!userId || !allowedEmail || primaryEmail !== allowedEmail) {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
     try {
-      const raw = req.params.filePath;
-      const filePath = Array.isArray(raw) ? raw.join('/') : raw;
-      const file = await objectStorageService.searchPublicObject(filePath);
-      if (!file) {
-        res.status(404).json({ error: 'File not found' });
+      const contentType = req.headers['content-type'];
+      if (!contentType || !ALLOWED_MIME_TYPES.includes(contentType)) {
+        res.status(400).json({ error: 'Invalid or missing Content-Type header' });
         return;
       }
 
-      const response = await objectStorageService.downloadObject(file);
-
-      res.status(response.status);
-      response.headers.forEach((value, key) => res.setHeader(key, value));
-
-      if (response.body) {
-        const nodeStream = Readable.fromWeb(
-          response.body as ReadableStream<Uint8Array>,
-        );
-        nodeStream.pipe(res);
-      } else {
-        res.end();
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(Buffer.from(chunk));
       }
+      const buffer = Buffer.concat(chunks);
+
+      if (buffer.length > MAX_FILE_SIZE) {
+        res.status(400).json({ error: 'File too large' });
+        return;
+      }
+
+      const result = await uploadImage(buffer, {
+        folder: 'crochet-boutique/products',
+      });
+
+      res.json({
+        url: result.secure_url,
+        publicId: result.public_id,
+      });
     } catch (error) {
-      req.log.error({ err: error }, 'Error serving public object');
-      res.status(500).json({ error: 'Failed to serve public object' });
+      if (error instanceof CloudinaryError) {
+        req.log.error({ err: error }, 'Cloudinary upload error');
+        res.status(500).json({ error: 'Failed to upload image' });
+        return;
+      }
+      req.log.error({ err: error }, 'Error uploading image');
+      res.status(500).json({ error: 'Failed to upload image' });
     }
   },
 );
 
-/**
- * GET /storage/objects/*
- *
- * Serve object entities from PRIVATE_OBJECT_DIR.
- * These are served from a separate path from /public-objects and can optionally
- * be protected with authentication or ACL checks based on the use case.
- */
-router.get('/storage/objects/*path', async (req: Request, res: Response) => {
-  try {
-    const raw = req.params.path;
-    const wildcardPath = Array.isArray(raw) ? raw.join('/') : raw;
-    const objectPath = `/objects/${wildcardPath}`;
-    const objectFile =
-      await objectStorageService.getObjectEntityFile(objectPath);
-
-    // --- Protected route example (uncomment when using replit-auth) ---
-    // if (!req.isAuthenticated()) {
-    //   res.status(401).json({ error: "Unauthorized" });
-    //   return;
-    // }
-    // const canAccess = await objectStorageService.canAccessObjectEntity({
-    //   userId: req.user.id,
-    //   objectFile,
-    //   requestedPermission: ObjectPermission.READ,
-    // });
-    // if (!canAccess) {
-    //   res.status(403).json({ error: "Forbidden" });
-    //   return;
-    // }
-
-    const response = await objectStorageService.downloadObject(objectFile);
-
-    res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
-
-    if (response.body) {
-      const nodeStream = Readable.fromWeb(
-        response.body as ReadableStream<Uint8Array>,
-      );
-      nodeStream.pipe(res);
-    } else {
-      res.end();
-    }
-  } catch (error) {
-    if (error instanceof ObjectNotFoundError) {
-      req.log.warn({ err: error }, 'Object not found');
-      res.status(404).json({ error: 'Object not found' });
+router.delete(
+  '/storage/image/:publicId',
+  async (req: Request, res: Response) => {
+    const authReq = req as Request & { auth?: () => { userId?: string | null } };
+    const userId = typeof authReq.auth === 'function' ? authReq.auth().userId : null;
+    const allowedEmail = process.env.CROCHET_ADMIN_EMAIL?.trim().toLowerCase();
+    const user = userId && allowedEmail ? await clerkClient.users.getUser(userId) : null;
+    const primaryEmail = user?.emailAddresses.find(
+      (email) => email.id === user.primaryEmailAddressId,
+    )?.emailAddress.trim().toLowerCase();
+    if (!userId || !allowedEmail || primaryEmail !== allowedEmail) {
+      res.status(403).json({ error: 'Admin access required' });
       return;
     }
-    req.log.error({ err: error }, 'Error serving object');
-    res.status(500).json({ error: 'Failed to serve object' });
-  }
-});
+
+    try {
+      const rawPublicId = req.params.publicId;
+      const publicId = Array.isArray(rawPublicId) ? rawPublicId[0] : rawPublicId;
+      if (!publicId || publicId.includes('..') || publicId.includes('/')) {
+        res.status(400).json({ error: 'Invalid public ID' });
+        return;
+      }
+
+      await deleteImage(publicId);
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof CloudinaryError) {
+        req.log.error({ err: error }, 'Cloudinary delete error');
+        res.status(500).json({ error: 'Failed to delete image' });
+        return;
+      }
+      req.log.error({ err: error }, 'Error deleting image');
+      res.status(500).json({ error: 'Failed to delete image' });
+    }
+  },
+);
 
 export default router;

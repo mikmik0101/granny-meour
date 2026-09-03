@@ -12,9 +12,9 @@
   "dependencies": {
     "@clerk/express": "^2.1.61",
     "@clerk/shared": "^4.29.3",
-    "@google-cloud/storage": "^8.0.1",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
+    "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",

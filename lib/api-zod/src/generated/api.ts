@@ -324,3 +324,24 @@ export const RequestUploadUrlResponse = zod.object({
 })
 
 
+/**
+ * @summary Upload an image file to Cloudinary
+ */
+export const UploadImageResponse = zod.object({
+  "url": zod.string().describe('Secure HTTPS URL of the uploaded image'),
+  "publicId": zod.string().describe('Cloudinary public ID for the uploaded image')
+})
+
+
+/**
+ * @summary Delete an image from Cloudinary
+ */
+export const DeleteImageParams = zod.object({
+  "publicId": zod.coerce.string()
+})
+
+export const DeleteImageResponse = zod.object({
+  "success": zod.boolean().optional()
+})
+
+
