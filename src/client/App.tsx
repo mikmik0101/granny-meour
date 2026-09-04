@@ -312,7 +312,7 @@ function AdminSettings() {
 }
 
 function Router() {
-  return <ErrorBoundary><Switch><Route path="/" component={Home} /><Route path="/products" component={Products} /><Route path="/products/:id" component={ProductDetail} /><Route path="/about" component={About} /><Route path="/contact" component={Contact} /><Route path="/admin/login" component={AdminLogin} /><Route path="/admin" component={AdminDashboard} /><Route path="/admin/products" component={AdminProducts} /><Route path="/admin/categories" component={AdminCategories} /><Route path="/admin/settings" component={AdminSettings} /><Route component={NotFound} /></Switch></ErrorBoundary>;
+  return <ErrorBoundary><Switch><Route path="/" component={Home} /><Route path="/products" component={Products} /><Route path="/products/:id" component={ProductDetail} /><Route path="/about" component={About} /><Route path="/contact" component={Contact} /><Route path="/admin/login/*" component={AdminLogin} /><Route path="/admin" component={AdminDashboard} /><Route path="/admin/products" component={AdminProducts} /><Route path="/admin/categories" component={AdminCategories} /><Route path="/admin/settings" component={AdminSettings} /><Route component={NotFound} /></Switch></ErrorBoundary>;
 }
 
 function App() {
