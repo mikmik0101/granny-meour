@@ -27,11 +27,19 @@ import {
 
 const router: IRouter = Router();
 
+function parseAdminEmails(): string[] {
+  const emails = process.env.CROCHET_ADMIN_EMAILS?.trim() || process.env.CROCHET_ADMIN_EMAIL?.trim() || "";
+  return emails
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0);
+}
+
 async function requireAdmin(req: Request, res: Response): Promise<boolean> {
   const authReq = req as Request & { auth?: () => { userId?: string | null } };
   const userId = typeof authReq.auth === "function" ? authReq.auth().userId : null;
-  const allowedEmail = process.env.CROCHET_ADMIN_EMAIL?.trim().toLowerCase();
-  if (!userId || !allowedEmail) {
+  const allowedEmails = parseAdminEmails();
+  if (!userId || allowedEmails.length === 0) {
     res.status(403).json({ error: "Admin access required" });
     return false;
   }
@@ -39,7 +47,7 @@ async function requireAdmin(req: Request, res: Response): Promise<boolean> {
   const primaryEmail = user.emailAddresses.find(
     (email) => email.id === user.primaryEmailAddressId,
   )?.emailAddress.trim().toLowerCase();
-  if (primaryEmail !== allowedEmail) {
+  if (!primaryEmail || !allowedEmails.includes(primaryEmail)) {
     res.status(403).json({ error: "Admin access required" });
     return false;
   }

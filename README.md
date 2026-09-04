@@ -27,7 +27,7 @@ DATABASE_URL=postgresql://user:password@host.neon.tech/dbname?sslmode=require
 # Clerk Authentication
 CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
-CROCHET_ADMIN_EMAIL=admin@example.com
+CROCHET_ADMIN_EMAILS=michacullamat@gmail.com,mickaelcullamat01@gmail.com
 
 # Cloudinary Image Storage
 CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -134,7 +134,7 @@ PORT=3000 BASE_PATH=/ pnpm --filter @workspace/crochet-boutique run dev
 
 ### Key Decisions
 
-- **Single-admin policy**: Only the Clerk user matching `CROCHET_ADMIN_EMAIL` can access admin routes. Enforced server-side in `requireAdmin()` middleware.
+- **Multi-admin policy**: Clerk users matching any email in `CROCHET_ADMIN_EMAILS` (comma-separated list) can access admin routes. Enforced server-side in `requireAdmin()` middleware.
 - **Catalog-only, no e-commerce**: Prices are informational (PHP via `Intl.NumberFormat`). Visitors inquire via contact methods (email, Instagram, Messenger). No cart, checkout, payment gateways, or automated ordering.
 - **Cloudinary for images**: All product images uploaded via admin are stored in Cloudinary. Secure HTTPS delivery URLs stored in DB (`image`, `additionalImages[]`). Cloudinary credentials never leave the server.
 - **Multi-image support**: Products support a cover image (`image`) + gallery (`additionalImages[]`). Admin can upload multiple, reorder, set cover, delete individual images.

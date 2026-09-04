@@ -4,6 +4,14 @@ import { RequestUploadUrlBody, RequestUploadUrlResponse } from '@shared/zod';
 
 import { uploadImage, deleteImage, CloudinaryError } from '../lib/cloudinary';
 
+function parseAdminEmails(): string[] {
+  const emails = process.env.CROCHET_ADMIN_EMAILS?.trim() || process.env.CROCHET_ADMIN_EMAIL?.trim() || "";
+  return emails
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0);
+}
+
 const router: IRouter = Router();
 
 const ALLOWED_MIME_TYPES = [
@@ -30,12 +38,12 @@ router.post(
   async (req: Request, res: Response) => {
     const authReq = req as Request & { auth?: () => { userId?: string | null } };
     const userId = typeof authReq.auth === 'function' ? authReq.auth().userId : null;
-    const allowedEmail = process.env.CROCHET_ADMIN_EMAIL?.trim().toLowerCase();
-    const user = userId && allowedEmail ? await clerkClient.users.getUser(userId) : null;
+    const allowedEmails = parseAdminEmails();
+    const user = userId && allowedEmails.length > 0 ? await clerkClient.users.getUser(userId) : null;
     const primaryEmail = user?.emailAddresses.find(
       (email) => email.id === user.primaryEmailAddressId,
     )?.emailAddress.trim().toLowerCase();
-    if (!userId || !allowedEmail || primaryEmail !== allowedEmail) {
+    if (!userId || allowedEmails.length === 0 || !primaryEmail || !allowedEmails.includes(primaryEmail)) {
       res.status(403).json({ error: 'Admin access required' });
       return;
     }
@@ -72,12 +80,12 @@ router.post(
   async (req: Request, res: Response) => {
     const authReq = req as Request & { auth?: () => { userId?: string | null } };
     const userId = typeof authReq.auth === 'function' ? authReq.auth().userId : null;
-    const allowedEmail = process.env.CROCHET_ADMIN_EMAIL?.trim().toLowerCase();
-    const user = userId && allowedEmail ? await clerkClient.users.getUser(userId) : null;
+    const allowedEmails = parseAdminEmails();
+    const user = userId && allowedEmails.length > 0 ? await clerkClient.users.getUser(userId) : null;
     const primaryEmail = user?.emailAddresses.find(
       (email) => email.id === user.primaryEmailAddressId,
     )?.emailAddress.trim().toLowerCase();
-    if (!userId || !allowedEmail || primaryEmail !== allowedEmail) {
+    if (!userId || allowedEmails.length === 0 || !primaryEmail || !allowedEmails.includes(primaryEmail)) {
       res.status(403).json({ error: 'Admin access required' });
       return;
     }
@@ -125,12 +133,12 @@ router.delete(
   async (req: Request, res: Response) => {
     const authReq = req as Request & { auth?: () => { userId?: string | null } };
     const userId = typeof authReq.auth === 'function' ? authReq.auth().userId : null;
-    const allowedEmail = process.env.CROCHET_ADMIN_EMAIL?.trim().toLowerCase();
-    const user = userId && allowedEmail ? await clerkClient.users.getUser(userId) : null;
+    const allowedEmails = parseAdminEmails();
+    const user = userId && allowedEmails.length > 0 ? await clerkClient.users.getUser(userId) : null;
     const primaryEmail = user?.emailAddresses.find(
       (email) => email.id === user.primaryEmailAddressId,
     )?.emailAddress.trim().toLowerCase();
-    if (!userId || !allowedEmail || primaryEmail !== allowedEmail) {
+    if (!userId || allowedEmails.length === 0 || !primaryEmail || !allowedEmails.includes(primaryEmail)) {
       res.status(403).json({ error: 'Admin access required' });
       return;
     }
