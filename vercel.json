@@ -3,10 +3,7 @@
   "buildCommand": "vite build",
   "outputDirectory": "dist/public",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "BASE_PATH": "/"
-  }
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/((?!api).*)", "destination": "/index.html" }
+  ]
 }

@@ -10,6 +10,10 @@ export default defineConfig({
   base: basePath,
   root: path.resolve(__dirname, 'src/client'),
   plugins: [react(), tailwindcss()],
+  define: {
+    'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(process.env.CLERK_PUBLISHABLE_KEY || ''),
+    'import.meta.env.VITE_CLERK_PROXY_URL': JSON.stringify(process.env.CLERK_PROXY_URL || ''),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src/client'),
