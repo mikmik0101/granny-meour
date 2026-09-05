@@ -192,6 +192,11 @@ function Contact() {
 
 function AdminLogin() {
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const { isLoaded, isSignedIn } = useAuth();
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    if (isLoaded && isSignedIn) setLocation('/admin');
+  }, [isLoaded, isSignedIn, setLocation]);
   return <div className="paper-grain flex min-h-[100dvh] items-center justify-center bg-primary px-5 py-8 text-primary-foreground"><div className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] bg-card text-foreground shadow-2xl md:grid-cols-2"><div className="yarn-art rose relative hidden min-h-[580px] p-10 md:block"><BrandMark settings={fallbackSettings} dark /><div className="absolute bottom-10 left-10 right-10"><p className="eyebrow text-primary-foreground/70">Studio door</p><p className="display-font mt-3 text-5xl text-primary-foreground">Welcome back to the worktable.</p></div></div><div className="flex min-h-[560px] flex-col justify-center p-4 md:p-8"><Link href="/" className="mb-6 inline-flex items-center gap-2 px-4 text-sm text-muted-foreground" data-testid="link-login-home"><ChevronLeft size={15} /> Back to shop</Link><SignIn routing="path" path={`${basePath}/admin/login`} signUpUrl={`${basePath}/admin/login`} appearance={{ theme: shadcn, variables: { colorPrimary: '#2d5a4d', colorForeground: '#273b34', colorMutedForeground: '#68776e', colorBackground: '#fffdf9', colorInput: '#fffaf4', colorNeutral: '#d9cfc4', fontFamily: 'DM Sans' }, elements: { cardBox: 'w-full max-w-none', card: '!shadow-none !border-0 !bg-transparent', footer: '!shadow-none !border-0 !bg-transparent', headerTitle: 'font-serif', formButtonPrimary: 'bg-[#2d5a4d] hover:bg-[#244b40]', formFieldInput: 'rounded-xl' } }} /></div></div></div>;
 }
 
