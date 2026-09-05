@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
-import healthRouter from "./health";
-import crochetRouter from "./crochet";
-import storageRouter from "./storage";
+import healthRouter from "./health.js";
+import crochetRouter from "./crochet.js";
+import storageRouter from "./storage.js";
 
 const router: IRouter = Router();
 

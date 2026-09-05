@@ -1,8 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { clerkClient } from '@clerk/express';
-import { RequestUploadUrlBody, RequestUploadUrlResponse } from '../../../shared/zod';
+import { RequestUploadUrlBody, RequestUploadUrlResponse } from '../../../shared/zod/index.js';
 
-import { uploadImage, deleteImage, CloudinaryError } from '../lib/cloudinary';
+import { uploadImage, deleteImage, CloudinaryError } from '../lib/cloudinary.js';
 
 function parseAdminEmails(): string[] {
   const emails = process.env.CROCHET_ADMIN_EMAILS?.trim() || process.env.CROCHET_ADMIN_EMAIL?.trim() || "";
