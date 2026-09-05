@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { clerkClient } from '@clerk/express';
-import { RequestUploadUrlBody, RequestUploadUrlResponse } from '@shared/zod';
+import { RequestUploadUrlBody, RequestUploadUrlResponse } from '../../../shared/zod';
 
 import { uploadImage, deleteImage, CloudinaryError } from '../lib/cloudinary';
 

@@ -17,13 +17,13 @@ import {
   UpdateProductBody,
   UpdateProductParams,
   UpdateSettingsBody,
-} from "@shared/zod";
-import { db } from "@shared/db";
+} from "../../../shared/zod";
+import { db } from "../../../shared/db";
 import {
   categoriesTable,
   productsTable,
   settingsTable,
-} from "@shared/db/schema";
+} from "../../../shared/db/schema";
 
 const router: IRouter = Router();
 
