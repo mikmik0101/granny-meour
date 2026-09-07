@@ -9,6 +9,7 @@
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build --config vite.config.ts",
     "build:server": "tsc -p tsconfig.json --noEmit",
+    "db:push": "drizzle-kit push --config=drizzle.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -52,6 +53,7 @@
     "cors": "^2.8.6",
     "date-fns": "^3.6.0",
     "drizzle-orm": "^0.45.2",
+    "drizzle-kit": "^0.31.4",
     "drizzle-zod": "^0.5.1",
     "embla-carousel-react": "^8.6.0",
     "express": "^5.2.1",
