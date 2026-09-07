@@ -70,7 +70,7 @@ function Button({ children, variant = 'primary', className = '', ...props }: { c
     ghost: 'text-muted-foreground hover:text-foreground hover:bg-muted',
     danger: 'bg-destructive text-destructive-foreground hover:opacity-90',
   };
-  return <button className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${styles[variant]} ${className}`} {...props}>{children}</button>;
+  return <button className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${styles[variant]} ${className}`} {...props}>{children}</button>;
 }
 
 function State({ kind, message, onRetry }: { kind: 'loading' | 'error' | 'empty'; message?: string; onRetry?: () => void }) {
@@ -248,29 +248,43 @@ function ProductForm({ initial, onDone, onCancel }: { initial?: ProductLike; onD
   const qc = useQueryClient();
   const [form, setForm] = useState({ name: initial?.name || '', description: initial?.description || '', price: String(initial?.price || ''), category: initial?.category || '', image: initial?.image || '', status: initial?.status || 'available', featured: initial?.featured || false, colors: initial?.colors?.join(', ') || '', variants: initial?.variants?.join(', ') || '', notes: initial?.notes || '' });
   const [imageFile, setImageFile] = useState<File | undefined>();
-  const busy = create.isPending || update.isPending;
+  const [uploading, setUploading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const busy = create.isPending || update.isPending || uploading;
   function field(key: string, value: string | boolean) { setForm((old) => ({ ...old, [key]: value })); }
+  function toErrorMessage(err: unknown, fallback: string) {
+    return err instanceof Error && err.message ? err.message : fallback;
+  }
   async function submit(e: FormEvent) {
     e.preventDefault();
+    setSubmitError(null);
     let image = form.image;
     if (imageFile) {
-      const uploadRes = await fetch('/api/storage/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': imageFile.type },
-        body: imageFile,
-      });
-      if (!uploadRes.ok) {
-        const err = await uploadRes.json().catch(() => ({ error: 'Upload failed' }));
-        throw new Error(err.error || 'Failed to upload image');
+      setUploading(true);
+      try {
+        const uploadRes = await fetch('/api/storage/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': imageFile.type },
+          body: imageFile,
+        });
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json().catch(() => ({ error: 'Upload failed' }));
+          throw new Error(err.error || 'Failed to upload image');
+        }
+        const { url } = await uploadRes.json();
+        image = url;
+      } catch (err) {
+        setSubmitError(toErrorMessage(err, 'Could not upload the photo. Please try again.'));
+        return;
+      } finally {
+        setUploading(false);
       }
-      const { url } = await uploadRes.json();
-      image = url;
     }
     const body = { name: form.name, description: form.description, price: Number(form.price), category: form.category, image: image || '', status: form.status as 'available' | 'sold-out' | 'coming-soon' | 'hidden', featured: form.featured, colors: form.colors.split(',').map((x) => x.trim()).filter(Boolean), variants: form.variants.split(',').map((x) => x.trim()).filter(Boolean), notes: form.notes || null };
-    const options = { onSuccess: () => { qc.invalidateQueries({ queryKey: getListProductsQueryKey() }); onDone(); } };
+    const options = { onSuccess: () => { qc.invalidateQueries({ queryKey: getListProductsQueryKey() }); onDone(); }, onError: (err: unknown) => { setSubmitError(toErrorMessage(err, 'Could not save the product. Please try again.')); } };
     if (initial) update.mutate({ id: initial.id, data: body }, options); else create.mutate({ data: body }, options);
   }
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4 backdrop-blur-sm"><form onSubmit={submit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-card p-6 shadow-2xl md:p-8"><div className="flex items-start justify-between"><div><p className="eyebrow">{initial ? 'Edit a piece' : 'Add to the shelf'}</p><h2 className="display-font mt-2 text-4xl">{initial ? initial.name : 'New product'}</h2></div><button type="button" onClick={onCancel} className="rounded-full p-2 hover:bg-muted" data-testid="button-close-product-form"><X size={19} /></button></div><div className="mt-7 grid gap-4 md:grid-cols-2"><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Name</span><input required value={form.name} onChange={(e) => field('name', e.target.value)} className="admin-input mt-2" data-testid="input-product-name" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Description</span><textarea required rows={3} value={form.description} onChange={(e) => field('description', e.target.value)} className="admin-input mt-2 resize-none" data-testid="textarea-product-description" /></label><label><span className="mono-label text-muted-foreground">Price</span><input required type="number" min="0" value={form.price} onChange={(e) => field('price', e.target.value)} className="admin-input mt-2" data-testid="input-product-price" /></label><label><span className="mono-label text-muted-foreground">Category</span><input required value={form.category} onChange={(e) => field('category', e.target.value)} className="admin-input mt-2" data-testid="input-product-category" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Product photo</span><input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0])} className="admin-input mt-2" data-testid="input-product-image" /><p className="mt-1 text-xs text-muted-foreground">{imageFile ? imageFile.name : initial?.image ? 'A photo is already attached. Choose a new one to replace it.' : 'Upload a JPG, PNG, or WebP image.'}</p></label><label><span className="mono-label text-muted-foreground">Status</span><select value={form.status} onChange={(e) => field('status', e.target.value)} className="admin-input mt-2" data-testid="select-product-status"><option value="available">Available</option><option value="coming-soon">Coming soon</option><option value="sold-out">Sold out</option><option value="hidden">Hidden</option></select></label><label className="flex items-end pb-3"><span className="flex items-center gap-3 text-sm"><input type="checkbox" checked={form.featured} onChange={(e) => field('featured', e.target.checked)} className="h-4 w-4 accent-[hsl(var(--primary))]" data-testid="checkbox-product-featured" /> Feature this piece</span></label><label><span className="mono-label text-muted-foreground">Colours</span><input value={form.colors} onChange={(e) => field('colors', e.target.value)} className="admin-input mt-2" placeholder="Sage, Oat" data-testid="input-product-colors" /></label><label><span className="mono-label text-muted-foreground">Variants</span><input value={form.variants} onChange={(e) => field('variants', e.target.value)} className="admin-input mt-2" placeholder="One size" data-testid="input-product-variants" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Private notes</span><input value={form.notes} onChange={(e) => field('notes', e.target.value)} className="admin-input mt-2" data-testid="input-product-notes" /></label></div><div className="mt-8 flex justify-end gap-3"><Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel-product">Cancel</Button><Button type="submit" disabled={busy} data-testid="button-save-product">{busy && <Loader2 className="animate-spin" size={16} />}{initial ? 'Save changes' : 'Add product'}</Button></div></form></div>;
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4 backdrop-blur-sm"><form onSubmit={submit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-card p-6 shadow-2xl md:p-8"><div className="flex items-start justify-between"><div><p className="eyebrow">{initial ? 'Edit a piece' : 'Add to the shelf'}</p><h2 className="display-font mt-2 text-4xl">{initial ? initial.name : 'New product'}</h2></div><button type="button" onClick={onCancel} className="rounded-full p-2 hover:bg-muted" data-testid="button-close-product-form"><X size={19} /></button></div><div className="mt-7 grid gap-4 md:grid-cols-2"><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Name</span><input required value={form.name} onChange={(e) => field('name', e.target.value)} className="admin-input mt-2" data-testid="input-product-name" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Description</span><textarea required rows={3} value={form.description} onChange={(e) => field('description', e.target.value)} className="admin-input mt-2 resize-none" data-testid="textarea-product-description" /></label><label><span className="mono-label text-muted-foreground">Price</span><input required type="number" min="0" value={form.price} onChange={(e) => field('price', e.target.value)} className="admin-input mt-2" data-testid="input-product-price" /></label><label><span className="mono-label text-muted-foreground">Category</span><input required value={form.category} onChange={(e) => field('category', e.target.value)} className="admin-input mt-2" data-testid="input-product-category" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Product photo</span><input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0])} className="admin-input mt-2" data-testid="input-product-image" /><p className="mt-1 text-xs text-muted-foreground">{imageFile ? imageFile.name : initial?.image ? 'A photo is already attached. Choose a new one to replace it.' : 'Upload a JPG, PNG, or WebP image.'}</p></label><label><span className="mono-label text-muted-foreground">Status</span><select value={form.status} onChange={(e) => field('status', e.target.value)} className="admin-input mt-2" data-testid="select-product-status"><option value="available">Available</option><option value="coming-soon">Coming soon</option><option value="sold-out">Sold out</option><option value="hidden">Hidden</option></select></label><label className="flex items-end pb-3"><span className="flex items-center gap-3 text-sm"><input type="checkbox" checked={form.featured} onChange={(e) => field('featured', e.target.checked)} className="h-4 w-4 accent-[hsl(var(--primary))]" data-testid="checkbox-product-featured" /> Feature this piece</span></label><label><span className="mono-label text-muted-foreground">Colours</span><input value={form.colors} onChange={(e) => field('colors', e.target.value)} className="admin-input mt-2" placeholder="Sage, Oat" data-testid="input-product-colors" /></label><label><span className="mono-label text-muted-foreground">Variants</span><input value={form.variants} onChange={(e) => field('variants', e.target.value)} className="admin-input mt-2" placeholder="One size" data-testid="input-product-variants" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Private notes</span><input value={form.notes} onChange={(e) => field('notes', e.target.value)} className="admin-input mt-2" data-testid="input-product-notes" /></label></div>{submitError && <p role="alert" className="mt-6 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive" data-testid="text-product-form-error">{submitError}</p>}<div className="mt-8 flex justify-end gap-3"><Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel-product">Cancel</Button><Button type="submit" disabled={busy} data-testid="button-save-product">{busy && <Loader2 className="animate-spin" size={16} />}{uploading ? 'Uploading photo…' : initial ? 'Save changes' : 'Add product'}</Button></div></form></div>;
 }
 
 function AdminProducts() {
