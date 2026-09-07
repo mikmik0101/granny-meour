@@ -37,6 +37,47 @@ export class CloudinaryError extends Error {
   }
 }
 
+const MAX_FAILURE_DETAIL_LENGTH = 300;
+
+// Cloudinary's own rejection text can echo back the submitted credential
+// values (e.g. "Unknown API key <value>"). Scrub the configured values so
+// server logs never contain secrets. Runs over the composed detail string.
+function redactSecrets(text: string): string {
+  let redacted = text;
+  for (const secret of [apiSecret, apiKey, cloudName]) {
+    if (secret && secret.length > 0 && redacted.includes(secret)) {
+      redacted = redacted.split(secret).join('[REDACTED]');
+    }
+  }
+  return redacted;
+}
+
+// Extract only safe, non-secret diagnostic fields from a Cloudinary SDK
+// rejection, which arrives nested as { error: { message, http_code } }.
+// Reads message/http_code/code scalars only — never credentials, headers,
+// bodies, signatures, query params, or tokens.
+function describeUploadFailure(error: unknown): string {
+  const nested = (error as { error?: unknown } | null)?.error ?? error;
+  const record =
+    typeof nested === 'object' && nested !== null
+      ? (nested as Record<string, unknown>)
+      : {};
+  const rawMessage = record.message;
+  const message =
+    typeof rawMessage === 'string' && rawMessage.length > 0
+      ? rawMessage.slice(0, MAX_FAILURE_DETAIL_LENGTH)
+      : 'unknown error';
+  const httpCode =
+    typeof record.http_code === 'number'
+      ? ` (http_code: ${record.http_code})`
+      : '';
+  const code =
+    typeof record.code === 'string' && record.code.length > 0
+      ? ` [${record.code.slice(0, 64)}]`
+      : '';
+  return redactSecrets(`${message}${httpCode}${code}`);
+}
+
 export async function uploadImage(
   buffer: Buffer,
   options: {
@@ -59,7 +100,11 @@ export async function uploadImage(
       },
       (error, result) => {
         if (error || !result) {
-          reject(new CloudinaryError('Failed to upload image to Cloudinary', error));
+          reject(
+            new CloudinaryError(
+              `Failed to upload image to Cloudinary: ${describeUploadFailure(error)}`,
+            ),
+          );
           return;
         }
         resolve({
