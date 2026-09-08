@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/reac
 import { ClerkProvider, SignIn, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
+import { upload as blobUpload } from '@vercel/blob/client';
 import {
   ArrowRight, Check, ChevronDown, ChevronLeft, CircleAlert, CircleCheck, Edit3, ExternalLink,
   Eye, EyeOff, Facebook, Heart, Instagram, LayoutDashboard, Leaf, Loader2, Mail, Menu,
@@ -260,19 +261,25 @@ function ProductForm({ initial, onDone, onCancel }: { initial?: ProductLike; onD
     setSubmitError(null);
     let image = form.image;
     if (imageFile) {
+      // Fast client-side feedback; the server-side token enforces the same
+      // MIME allowlist and size cap regardless of what the browser sends.
+      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(imageFile.type)) {
+        setSubmitError(`Unsupported file type: ${imageFile.type || 'unknown'}. Allowed: JPG, PNG, WebP, GIF.`);
+        return;
+      }
+      if (imageFile.size > 10 * 1024 * 1024) {
+        setSubmitError('File too large. Maximum: 10 MB.');
+        return;
+      }
       setUploading(true);
       try {
-        const uploadRes = await fetch('/api/storage/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': imageFile.type },
-          body: imageFile,
+        const extension = imageFile.name.split('.').pop()?.replace(/[^a-z0-9]/gi, '') || 'jpg';
+        const result = await blobUpload(`crochet-boutique/products/product-${Date.now()}.${extension}`, imageFile, {
+          access: 'public',
+          handleUploadUrl: '/api/storage/upload',
+          contentType: imageFile.type,
         });
-        if (!uploadRes.ok) {
-          const err = await uploadRes.json().catch(() => ({ error: 'Upload failed' }));
-          throw new Error(err.error || 'Failed to upload image');
-        }
-        const { url } = await uploadRes.json();
-        image = url;
+        image = result.url;
       } catch (err) {
         setSubmitError(toErrorMessage(err, 'Could not upload the photo. Please try again.'));
         return;

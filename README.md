@@ -7,7 +7,7 @@ A feminine, handmade crochet boutique showcase — a catalog-only site where vis
 ### Production Stack
 - **Frontend & API Hosting**: Vercel
 - **Database**: Neon (PostgreSQL)
-- **Image Storage**: Cloudinary
+- **Image Storage**: Vercel Blob
 - **Authentication**: Clerk
 
 ### Quick Deploy to Vercel
@@ -29,10 +29,8 @@ CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 CROCHET_ADMIN_EMAILS=michacullamat@gmail.com,mickaelcullamat01@gmail.com
 
-# Cloudinary Image Storage
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+# Vercel Blob Image Storage
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_read_write_token
 
 # Build Configuration
 PORT=3000
@@ -55,15 +53,8 @@ Vercel automatically detects the monorepo structure via `vercel.json`:
 
 ### Image Migration
 
-After first deploy, migrate existing images to Cloudinary:
-
-```bash
-# Dry run first
-pnpm --filter @workspace/scripts run migrate-images -- --dry-run
-
-# Apply migration
-pnpm --filter @workspace/scripts run migrate-images
-```
+Existing product image URLs (including previously uploaded Cloudinary URLs) are
+served as-is — no automatic rewrites or deletions. New uploads go to Vercel Blob.
 
 ---
 
@@ -99,7 +90,6 @@ PORT=3000 BASE_PATH=/ pnpm --filter @workspace/crochet-boutique run dev
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/scripts run migrate-images` — migrate images to Cloudinary
 
 ---
 
@@ -111,7 +101,7 @@ PORT=3000 BASE_PATH=/ pnpm --filter @workspace/crochet-boutique run dev
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (API), Vite (frontend)
-- Image Storage: Cloudinary
+- Image Storage: Vercel Blob
 - Auth: Clerk
 - Frontend: React 19, wouter, TanStack Query, Tailwind CSS v4
 
@@ -121,8 +111,8 @@ PORT=3000 BASE_PATH=/ pnpm --filter @workspace/crochet-boutique run dev
 
 - `artifacts/api-server/` — Express API server
   - `src/routes/crochet.ts` — Product, category, settings, dashboard routes (admin-protected)
-  - `src/routes/storage.ts` — Cloudinary image upload/delete endpoints (admin-protected)
-  - `src/lib/cloudinary.ts` — Cloudinary service (upload, delete, optimized URLs)
+  - `src/routes/storage.ts` — Vercel Blob image upload/delete endpoints (admin-protected)
+  - `src/lib/blob-storage.ts` — Vercel Blob service (upload, delete)
 - `artifacts/crochet-boutique/` — React frontend (Vite + wouter + TanStack Query)
   - `src/App.tsx` — All pages: Home, Products, ProductDetail, About, Contact, Admin
   - `src/index.css` — Design tokens: Playfair Display, yarn-art gradients, paper grain
@@ -136,7 +126,7 @@ PORT=3000 BASE_PATH=/ pnpm --filter @workspace/crochet-boutique run dev
 
 - **Multi-admin policy**: Clerk users matching any email in `CROCHET_ADMIN_EMAILS` (comma-separated list) can access admin routes. Enforced server-side in `requireAdmin()` middleware.
 - **Catalog-only, no e-commerce**: Prices are informational (PHP via `Intl.NumberFormat`). Visitors inquire via contact methods (email, Instagram, Messenger). No cart, checkout, payment gateways, or automated ordering.
-- **Cloudinary for images**: All product images uploaded via admin are stored in Cloudinary. Secure HTTPS delivery URLs stored in DB (`image`, `additionalImages[]`). Cloudinary credentials never leave the server.
+- **Vercel Blob for images**: All product images uploaded via admin are stored in Vercel Blob. Secure HTTPS delivery URLs stored in DB (`image`, `additionalImages[]`). Blob credentials never leave the server.
 - **Multi-image support**: Products support a cover image (`image`) + gallery (`additionalImages[]`). Admin can upload multiple, reorder, set cover, delete individual images.
 - **Generated API layer**: OpenAPI → Zod → React Query hooks. Never edit generated files; update `openapi.yaml` then run codegen.
 
@@ -160,7 +150,7 @@ PORT=3000 BASE_PATH=/ pnpm --filter @workspace/crochet-boutique run dev
 ## Security
 
 - Admin auth on every mutation (server-side `requireAdmin()`)
-- Cloudinary secret server-only
+- Vercel Blob token server-only
 - Clerk primary email verification
 - File validation (MIME type, size)
 - Admin-only upload/delete endpoints
@@ -169,7 +159,7 @@ PORT=3000 BASE_PATH=/ pnpm --filter @workspace/crochet-boutique run dev
 
 - **Always run codegen after changing openapi.yaml**: `pnpm --filter @workspace/api-spec run codegen`
 - **Admin auth is server-side**: Frontend `/api/admin/access` check is UI-only
-- **Cloudinary secret never in frontend**: Only `CLOUDINARY_CLOUD_NAME` could be public
-- **Image URLs in DB are HTTPS Cloudinary delivery URLs**
+- **Blob token never in frontend**: `BLOB_READ_WRITE_TOKEN` is server-only; uploads go through the admin-authenticated API route
+- **Image URLs in DB are HTTPS Vercel Blob delivery URLs** (legacy Cloudinary URLs remain untouched)
 - **Migration script**: Run with `--dry-run` first
 - **No Replit dependencies**: Removed all Replit-specific packages and configuration
