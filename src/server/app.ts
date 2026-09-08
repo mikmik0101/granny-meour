@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes/index.js";
@@ -34,7 +34,17 @@ app.use(
 );
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use(cors());
-app.use(express.json());
+// Malformed JSON bodies must return a JSON 400 for API routes instead of an
+// HTML 500 error page from Express's default handler.
+app.use(express.json({ limit: "64kb" }));
+app.use((err: Error & { type?: string; statusCode?: number }, req: Request, res: Response, next: NextFunction) => {
+  const isParseFailure = err?.type === "entity.parse.failed" || err?.statusCode === 400;
+  if (isParseFailure && req.path.startsWith("/api")) {
+    res.status(400).json({ error: "Invalid request body." });
+    return;
+  }
+  next(err);
+});
 app.use(express.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
