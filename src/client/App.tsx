@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { upload as blobUpload } from '@vercel/blob/client';
 import {
-  ArrowRight, Check, ChevronDown, ChevronLeft, CircleAlert, CircleCheck, Edit3, ExternalLink,
+  ArrowRight, Check, ChevronDown, ChevronLeft, CircleAlert, CircleCheck, Copy, Edit3, ExternalLink,
   Eye, EyeOff, Facebook, Heart, Instagram, LayoutDashboard, Leaf, Loader2, Mail, Menu,
-  MessageCircle, Package, Pencil, Plus, Search, Settings, ShoppingBag, Sparkles, Tag,
+  MessageCircle, Package, Pencil, Phone, Plus, Search, Settings, ShoppingBag, Sparkles, Tag,
   Trash2, Waves, X, type LucideIcon,
 } from 'lucide-react';
 import {
@@ -43,9 +43,10 @@ const fallbackSettings: SettingsLike = {
   aboutTitle: 'Made by hand, meant to be held.',
   aboutContent: 'Granny Meour is a one-person crochet studio making useful, whimsical things for warm homes and thoughtful gifting. Every piece is stitched in small batches, with a little room for the yarn to surprise me.',
   contactMethods: [
-    { id: 'facebook', platform: 'facebook', label: 'Facebook', description: 'Find me on Facebook', value: 'https://www.facebook.com/michaelalyka.cullamat', enabled: true },
-    { id: 'instagram', platform: 'instagram', label: 'Instagram', description: 'Follow for handmade crochet', value: 'https://www.instagram.com/meour__?igsi=ZDNlZDc0MzIxNw==', enabled: true },
-    { id: 'email', platform: 'email', label: 'Email', description: 'Send me a message', value: 'michacullamat@gmail.com', enabled: true },
+    { id: "facebook", platform: "facebook", label: "Facebook", description: "Find me on Facebook", value: "https://www.facebook.com/michaelalyka.cullamat", enabled: true },
+    { id: "instagram", platform: "instagram", label: "Instagram", description: "Follow for handmade crochet", value: "https://www.instagram.com/meour__?stkn=aGEzbTV4bzIzdTZx", enabled: true },
+    { id: "email", platform: "email", label: "Gmail", description: "Send me a message", value: "michacullamat@gmail.com", enabled: true },
+    { id: "phone", platform: "phone", label: "Phone", description: "Tap to copy the number", value: "09369409844", enabled: true },
   ],
 };
 
@@ -181,13 +182,48 @@ function contactHref(m: ContactMethodLike, productName?: string): string {
 function ContactMethodIcon({ platform, size = 20 }: { platform: string; size?: number }) {
   if (platform === 'email') return <Mail size={size} />;
   if (platform === 'facebook') return <Facebook size={size} />;
-  if (platform === 'phone') return <MessageCircle size={size} />;
+  if (platform === 'phone') return <Phone size={size} />;
   return <Instagram size={size} />;
 }
 
 function ContactMethodCard({ method, productName, testIdPrefix }: { method: ContactMethodLike; productName?: string; testIdPrefix: string }) {
-  const isPhone = method.platform === 'phone';
-  return <a href={contactHref(method, productName)} target={isPhone ? undefined : '_blank'} rel="noreferrer" className="group flex items-center gap-4 rounded-xl border border-border bg-card p-5 transition-colors hover:bg-muted" data-testid={`${testIdPrefix}-${method.id}`}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary"><ContactMethodIcon platform={method.platform} /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{method.label}</strong><span className="mt-1 block truncate text-sm text-muted-foreground group-hover:text-foreground">{method.value}</span></span><ExternalLink size={14} className="ml-auto shrink-0 text-muted-foreground" /></a>;
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const copyTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (copyTimer.current !== null) window.clearTimeout(copyTimer.current); }, []);
+  // Phone never navigates: it copies the number to the clipboard only.
+  if (method.platform === 'phone') {
+    async function copyNumber() {
+      setCopyFailed(false);
+      try {
+        if (navigator.clipboard && window.isSecureContext !== false) {
+          await navigator.clipboard.writeText(method.value);
+        } else {
+          throw new Error('clipboard unavailable');
+        }
+      } catch {
+        try {
+          const area = document.createElement('textarea');
+          area.value = method.value;
+          area.setAttribute('readonly', '');
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          document.body.appendChild(area);
+          area.select();
+          document.execCommand('copy');
+          document.body.removeChild(area);
+        } catch {
+          setCopyFailed(true);
+          return;
+        }
+      }
+      setCopied(true);
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+      copyTimer.current = window.setTimeout(() => setCopied(false), 2000);
+    }
+    return <button type="button" onClick={copyNumber} className="group flex w-full items-center gap-4 rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" data-testid={`${testIdPrefix}-${method.id}`}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary">{copied ? <Check size={20} /> : <Copy size={20} />}</span><span className="min-w-0 flex-1"><strong className="block text-sm">{method.label}</strong><span role="status" className="mt-1 block text-sm text-muted-foreground">{copied ? 'Copied!' : copyFailed ? 'Copy is unavailable in this browser' : 'Tap to copy'}</span></span></button>;
+  }
+  return <a href={contactHref(method, productName)} target="_blank" rel="noreferrer" className="group flex items-center gap-4 rounded-xl border border-border bg-card p-5 transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" data-testid={`${testIdPrefix}-${method.id}`}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary"><ContactMethodIcon platform={method.platform} /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{method.label}</strong></span><ExternalLink size={14} className="ml-auto shrink-0 text-muted-foreground" /></a>;
 }
 
 function InquireModal({ productName, methods, onClose }: { productName: string; methods: ContactMethodLike[]; onClose: () => void }) {
@@ -232,7 +268,7 @@ function Contact() {
   const settings = (data as SettingsLike | undefined) || fallbackSettings;
   const methods = settings.contactMethods.filter((m) => m.enabled && m.value.trim());
 
-  return <PublicShell><section className="mx-auto max-w-7xl px-5 pb-24 pt-16 lg:px-10"><div className="max-w-2xl"><p className="eyebrow">Get in touch</p><h1 className="display-font mt-4 text-5xl leading-none md:text-7xl">Let&apos;s make something together.</h1><p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">Have a question about a piece, custom order, or availability? Reach out to Granny Meour directly.</p></div><div className="mt-10 max-w-3xl"><ContactOptionsGrid methods={methods} testIdPrefix="link-contact" /></div></section></PublicShell>;
+  return <PublicShell><section className="mx-auto max-w-7xl px-5 pb-24 pt-16 lg:px-10"><div className="grid items-stretch gap-10 lg:grid-cols-2 lg:gap-14"><div className="flex flex-col justify-center"><p className="eyebrow">Get in touch</p><h1 className="display-font mt-4 text-5xl leading-none md:text-7xl">Let&apos;s make something together.</h1><p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">Have a question about a piece, custom order, or availability? Reach out to Granny Meour directly.</p><div className="mt-10"><ContactOptionsGrid methods={methods} testIdPrefix="link-contact" /></div></div><div className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-secondary px-8 py-14 text-center md:min-h-[480px]"><div className="yarn-art absolute inset-0 opacity-60" /><div className="absolute -right-10 -top-10 h-36 w-36 rounded-full border border-accent" /><div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-accent/50" /><span className="absolute right-8 top-8 flex h-12 w-12 rotate-12 items-center justify-center rounded-full border border-primary-foreground/40 text-primary-foreground"><Sparkles size={20} /></span><div className="relative"><p className="eyebrow">Always happy to chat</p><h2 className="display-font mx-auto mt-4 max-w-xs text-4xl uppercase leading-tight md:text-5xl">Let&apos;s stay connected</h2><p className="mt-4 text-sm leading-6 text-muted-foreground">Pick the way that feels right for you.</p></div></div></div></section></PublicShell>;
 }
 function AdminLogin() {
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -371,13 +407,26 @@ function AdminSettings() {
   const qc = useQueryClient();
   const settings = (data as SettingsLike | undefined) || fallbackSettings;
   const [form, setForm] = useState<SettingsLike | null>(null);
+  const [newMethod, setNewMethod] = useState({ platform: 'phone', label: '', value: '' });
   const value = form || settings;
   function set(key: string, val: string) { setForm((old) => ({ ...(old || settings), [key]: val } as SettingsLike)); }
   function setContact(index: number, key: string, val: string | boolean) { setForm((old) => { const next = { ...(old || settings) }; next.contactMethods = next.contactMethods.map((m, i) => i === index ? { ...m, [key]: val } : m); return next; }); }
+  function addContact() {
+    const label = newMethod.label.trim();
+    const contactValue = newMethod.value.trim();
+    if (!label || !contactValue) return;
+    const entry = { id: `m-${Date.now()}`, platform: newMethod.platform, label, description: '', value: contactValue, enabled: true };
+    setForm((old) => { const next = { ...(old || settings) }; next.contactMethods = [...next.contactMethods, entry]; return next; });
+    setNewMethod((old) => ({ ...old, label: '', value: '' }));
+  }
+  function removeContact(id: string, label: string) {
+    if (!window.confirm(`Remove the ${label} contact method?`)) return;
+    setForm((old) => { const next = { ...(old || settings) }; next.contactMethods = next.contactMethods.filter((m) => m.id !== id); return next; });
+  }
   function submit(e: FormEvent) { e.preventDefault(); update.mutate({ data: value }, { onSuccess: (saved: SettingsLike) => { setForm(saved); qc.invalidateQueries({ queryKey: getGetSettingsQueryKey() }); } }); }
   if (isLoading) return <AdminShell><div className="h-80 animate-pulse rounded-2xl bg-muted" /></AdminShell>;
   if (isError) return <AdminShell><State kind="error" onRetry={refetch} /></AdminShell>;
-  return <AdminShell><div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="eyebrow">The storefront voice</p><h1 className="display-font mt-2 text-5xl">Site settings.</h1><p className="mt-3 text-sm text-muted-foreground">Keep the words feeling like you.</p></div><Button type="button" onClick={submit} disabled={update.isPending} data-testid="button-save-settings">{update.isPending && <Loader2 size={16} className="animate-spin" />} Save changes</Button></div><form onSubmit={submit} className="mt-10 grid gap-8 lg:grid-cols-[1.2fr_.8fr]"><div className="space-y-7 rounded-2xl border border-border bg-card p-6 md:p-8"><div><p className="mono-label text-muted-foreground">Identity</p><div className="mt-4 grid gap-4 md:grid-cols-2"><label><span className="text-sm font-semibold">Brand name</span><input value={value.brandName} onChange={(e) => set('brandName', e.target.value)} className="admin-input mt-2" data-testid="input-settings-brand" /></label><label><span className="text-sm font-semibold">Logo URL</span><input value={value.logo || ''} onChange={(e) => set('logo', e.target.value)} className="admin-input mt-2" data-testid="input-settings-logo" /></label></div></div><div className="border-t border-border pt-7"><p className="mono-label text-muted-foreground">Homepage welcome</p><div className="mt-4 grid gap-4"><label><span className="text-sm font-semibold">Eyebrow</span><input value={value.heroSubtitle} onChange={(e) => set('heroSubtitle', e.target.value)} className="admin-input mt-2" data-testid="input-settings-hero-subtitle" /></label><label><span className="text-sm font-semibold">Hero title</span><input value={value.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className="admin-input mt-2" data-testid="input-settings-hero-title" /></label><label><span className="text-sm font-semibold">Hero description</span><textarea rows={3} value={value.heroDescription} onChange={(e) => set('heroDescription', e.target.value)} className="admin-input mt-2 resize-none" data-testid="textarea-settings-hero-description" /></label></div></div><div className="border-t border-border pt-7"><p className="mono-label text-muted-foreground">About the maker</p><div className="mt-4 grid gap-4"><label><span className="text-sm font-semibold">About title</span><input value={value.aboutTitle} onChange={(e) => set('aboutTitle', e.target.value)} className="admin-input mt-2" data-testid="input-settings-about-title" /></label><label><span className="text-sm font-semibold">About content</span><textarea rows={6} value={value.aboutContent} onChange={(e) => set('aboutContent', e.target.value)} className="admin-input mt-2 resize-none" data-testid="textarea-settings-about-content" /></label></div></div></div><div className="h-fit rounded-2xl bg-secondary p-6 md:p-8"><p className="mono-label text-muted-foreground">Live preview</p><div className="mt-8"><p className="eyebrow">{value.heroSubtitle}</p><h2 className="display-font mt-3 text-4xl leading-none">{value.heroTitle}</h2><p className="mt-5 text-sm leading-6 text-muted-foreground">{value.heroDescription}</p></div><div className="mt-10 border-t border-foreground/15 pt-6"><p className="text-sm font-semibold">Contact methods</p><div className="mt-4 grid gap-3">{value.contactMethods.map((m, i) => <div className="rounded-xl bg-card/70 p-3" key={m.id}><div className="flex items-center justify-between gap-3"><span className="text-sm font-semibold">{m.label}</span><label className="flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={m.enabled} onChange={(e) => setContact(i, 'enabled', e.target.checked)} className="accent-[hsl(var(--primary))]" /> Enabled</label></div><input value={m.value} onChange={(e) => setContact(i, 'value', e.target.value)} placeholder="Profile link, email, or phone" className="admin-input mt-3" /></div>)}</div><Link href="/contact" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold" data-testid="link-settings-contact-preview">View contact page <ArrowRight size={14} /></Link></div></div></form></AdminShell>;
+  return <AdminShell><div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="eyebrow">The storefront voice</p><h1 className="display-font mt-2 text-5xl">Site settings.</h1><p className="mt-3 text-sm text-muted-foreground">Keep the words feeling like you.</p></div><Button type="button" onClick={submit} disabled={update.isPending} data-testid="button-save-settings">{update.isPending && <Loader2 size={16} className="animate-spin" />} Save changes</Button></div><form onSubmit={submit} className="mt-10 grid gap-8 lg:grid-cols-[1.2fr_.8fr]"><div className="space-y-7 rounded-2xl border border-border bg-card p-6 md:p-8"><div><p className="mono-label text-muted-foreground">Identity</p><div className="mt-4 grid gap-4 md:grid-cols-2"><label><span className="text-sm font-semibold">Brand name</span><input value={value.brandName} onChange={(e) => set('brandName', e.target.value)} className="admin-input mt-2" data-testid="input-settings-brand" /></label><label><span className="text-sm font-semibold">Logo URL</span><input value={value.logo || ''} onChange={(e) => set('logo', e.target.value)} className="admin-input mt-2" data-testid="input-settings-logo" /></label></div></div><div className="border-t border-border pt-7"><p className="mono-label text-muted-foreground">Homepage welcome</p><div className="mt-4 grid gap-4"><label><span className="text-sm font-semibold">Eyebrow</span><input value={value.heroSubtitle} onChange={(e) => set('heroSubtitle', e.target.value)} className="admin-input mt-2" data-testid="input-settings-hero-subtitle" /></label><label><span className="text-sm font-semibold">Hero title</span><input value={value.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className="admin-input mt-2" data-testid="input-settings-hero-title" /></label><label><span className="text-sm font-semibold">Hero description</span><textarea rows={3} value={value.heroDescription} onChange={(e) => set('heroDescription', e.target.value)} className="admin-input mt-2 resize-none" data-testid="textarea-settings-hero-description" /></label></div></div><div className="border-t border-border pt-7"><p className="mono-label text-muted-foreground">About the maker</p><div className="mt-4 grid gap-4"><label><span className="text-sm font-semibold">About title</span><input value={value.aboutTitle} onChange={(e) => set('aboutTitle', e.target.value)} className="admin-input mt-2" data-testid="input-settings-about-title" /></label><label><span className="text-sm font-semibold">About content</span><textarea rows={6} value={value.aboutContent} onChange={(e) => set('aboutContent', e.target.value)} className="admin-input mt-2 resize-none" data-testid="textarea-settings-about-content" /></label></div></div></div><div className="h-fit rounded-2xl bg-secondary p-6 md:p-8"><p className="mono-label text-muted-foreground">Live preview</p><div className="mt-8"><p className="eyebrow">{value.heroSubtitle}</p><h2 className="display-font mt-3 text-4xl leading-none">{value.heroTitle}</h2><p className="mt-5 text-sm leading-6 text-muted-foreground">{value.heroDescription}</p></div><div className="mt-10 border-t border-foreground/15 pt-6"><p className="text-sm font-semibold">Contact methods</p><div className="mt-4 grid gap-3">{value.contactMethods.map((m, i) => <div className="rounded-xl bg-card/70 p-3" key={m.id}><div className="flex items-center justify-between gap-3"><input value={m.label} onChange={(e) => setContact(i, 'label', e.target.value)} placeholder="Label" aria-label="Contact method label" className="admin-input flex-1" data-testid={`input-contact-label-${m.id}`} /><label className="flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={m.enabled} onChange={(e) => setContact(i, 'enabled', e.target.checked)} className="accent-[hsl(var(--primary))]" /> Enabled</label><button type="button" onClick={() => removeContact(m.id, m.label)} className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-destructive" aria-label={`Remove ${m.label} contact method`} data-testid={`button-remove-contact-${m.id}`}><X size={15} /></button></div><input value={m.value} onChange={(e) => setContact(i, 'value', e.target.value)} placeholder="Profile link, email, or phone" className="admin-input mt-3" /></div>)}<div className="rounded-xl border border-dashed border-border p-3"><p className="mono-label text-muted-foreground">Add a contact method</p><div className="mt-3 grid gap-2"><select value={newMethod.platform} onChange={(e) => setNewMethod((old) => ({ ...old, platform: e.target.value }))} className="admin-input" data-testid="select-new-contact-platform"><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="email">Email</option><option value="phone">Phone</option></select><input value={newMethod.label} onChange={(e) => setNewMethod((old) => ({ ...old, label: e.target.value }))} placeholder="Label (e.g. Phone)" className="admin-input" data-testid="input-new-contact-label" /><input value={newMethod.value} onChange={(e) => setNewMethod((old) => ({ ...old, value: e.target.value }))} placeholder="Profile link, email, or phone" className="admin-input" data-testid="input-new-contact-value" /><Button type="button" onClick={addContact} className="w-full" data-testid="button-add-contact"><Plus size={16} /> Add method</Button></div></div></div><Link href="/contact" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold" data-testid="link-settings-contact-preview">View contact page <ArrowRight size={14} /></Link></div></div></form></AdminShell>;
 }
 
 function Router() {
