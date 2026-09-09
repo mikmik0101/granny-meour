@@ -83,7 +83,7 @@ const fallbackSettings = {
       platform: "instagram",
       label: "Instagram",
       description: "Follow for handmade crochet",
-      value: "https://www.instagram.com/meour__?stkn=aGEzbTV4bzIzdTZx",
+      value: "https://www.instagram.com/meour__/",
       enabled: true,
     },
     {

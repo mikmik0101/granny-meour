@@ -44,7 +44,7 @@ const fallbackSettings: SettingsLike = {
   aboutContent: 'Granny Meour is a one-person crochet studio making useful, whimsical things for warm homes and thoughtful gifting. Every piece is stitched in small batches, with a little room for the yarn to surprise me.',
   contactMethods: [
     { id: "facebook", platform: "facebook", label: "Facebook", description: "Find me on Facebook", value: "https://www.facebook.com/michaelalyka.cullamat", enabled: true },
-    { id: "instagram", platform: "instagram", label: "Instagram", description: "Follow for handmade crochet", value: "https://www.instagram.com/meour__?stkn=aGEzbTV4bzIzdTZx", enabled: true },
+    { id: "instagram", platform: "instagram", label: "Instagram", description: "Follow for handmade crochet", value: "https://www.instagram.com/meour__/", enabled: true },
     { id: "email", platform: "email", label: "Gmail", description: "Send me a message", value: "michacullamat@gmail.com", enabled: true },
     { id: "phone", platform: "phone", label: "Phone", description: "Tap to copy the number", value: "09369409844", enabled: true },
   ],
@@ -173,9 +173,9 @@ function contactHref(m: ContactMethodLike, productName?: string): string {
     return `mailto:${m.value}`;
   }
   if (m.platform === 'phone') return `tel:${m.value.replace(/\s/g, '')}`;
+  if (m.value.startsWith('http')) return m.value;
   if (m.platform === 'facebook') return `https://facebook.com/${m.value.replace('@', '')}`;
   if (m.platform === 'instagram') return `https://instagram.com/${m.value.replace('@', '')}`;
-  if (m.value.startsWith('http')) return m.value;
   return '#';
 }
 
