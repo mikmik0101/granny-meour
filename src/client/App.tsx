@@ -83,7 +83,7 @@ function State({ kind, message, onRetry }: { kind: 'loading' | 'error' | 'empty'
 
 function BrandMark({ settings, dark = false }: { settings?: SettingsLike; dark?: boolean }) {
   return <Link href="/" className={`group flex items-center gap-3 ${dark ? 'text-sidebar-foreground' : 'text-foreground'}`} data-testid="link-brand-home">
-    {settings?.logo ? <img src={settings.logo} className="h-10 w-10 rounded-full object-cover" alt={settings.brandName} /> : <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-foreground"><Waves size={20} strokeWidth={1.6} /></span>}
+    {settings?.logo ? <img src={settings.logo} className="h-10 w-10 rounded-full object-cover" alt={settings.brandName} /> : <img src="/granny-meour-logo.png" className="h-10 w-10 rounded-full object-cover" alt="Granny Meour logo" />}
     <span><strong className="display-font text-xl tracking-tight">{settings?.brandName || 'Granny Meour'}</strong><span className="block text-[10px] uppercase tracking-[.18em] opacity-60">handmade crochet</span></span>
   </Link>;
 }
