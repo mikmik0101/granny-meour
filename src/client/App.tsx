@@ -153,18 +153,74 @@ function Products() {
   return <PublicShell><section className="mx-auto max-w-7xl px-5 pb-24 pt-14 lg:px-10"><div className="max-w-2xl"><p className="eyebrow">The collection</p><h1 className="display-font mt-4 text-5xl leading-none md:text-7xl">Things to keep.</h1><p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">Wearable, useful, and a little bit whimsical. Every piece is made in a small batch, then introduced here when it is ready.</p></div><div className="mt-12 flex flex-col gap-3 border-y border-border py-4 md:flex-row md:items-center"><label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={17} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search the shelves" className="site-input pl-10" data-testid="input-search-products" /></label><select value={category} onChange={(e) => setCategory(e.target.value)} className="site-input md:w-48" data-testid="select-category-products"><option value="">All categories</option>{categories.map((c) => <option value={c.name} key={c.id}>{c.name}</option>)}</select><select value={sort} onChange={(e) => setSort(e.target.value)} className="site-input md:w-44" data-testid="select-sort-products"><option value="newest">Newest first</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option><option value="name">Name A–Z</option></select></div><div className="mt-10">{isLoading ? <State kind="loading" /> : isError ? <State kind="error" message="The collection is taking a breather." onRetry={refetch} /> : products.length ? <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">{products.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}</div> : <State kind="empty" />}</div></section></PublicShell>;
 }
 
+
+type ContactMethodLike = {
+  id: string;
+  platform: string;
+  label: string;
+  value: string;
+  enabled: boolean;
+};
+
+function contactHref(m: ContactMethodLike, productName?: string): string {
+  if (m.platform === 'email') {
+    if (productName) {
+      const subject = encodeURIComponent(`Inquiry about ${productName}`);
+      const body = encodeURIComponent(`Hello Granny Meour,\n\nI would like to inquire about the following product:\n\nProduct: ${productName}\n\nThank you.`);
+      return `mailto:${m.value}?subject=${subject}&body=${body}`;
+    }
+    return `mailto:${m.value}`;
+  }
+  if (m.platform === 'phone') return `tel:${m.value.replace(/\s/g, '')}`;
+  if (m.platform === 'facebook') return `https://facebook.com/${m.value.replace('@', '')}`;
+  if (m.platform === 'instagram') return `https://instagram.com/${m.value.replace('@', '')}`;
+  if (m.value.startsWith('http')) return m.value;
+  return '#';
+}
+
+function ContactMethodIcon({ platform, size = 20 }: { platform: string; size?: number }) {
+  if (platform === 'email') return <Mail size={size} />;
+  if (platform === 'facebook') return <Facebook size={size} />;
+  if (platform === 'phone') return <MessageCircle size={size} />;
+  return <Instagram size={size} />;
+}
+
+function ContactMethodCard({ method, productName, testIdPrefix }: { method: ContactMethodLike; productName?: string; testIdPrefix: string }) {
+  const isPhone = method.platform === 'phone';
+  return <a href={contactHref(method, productName)} target={isPhone ? undefined : '_blank'} rel="noreferrer" className="group flex items-center gap-4 rounded-xl border border-border bg-card p-5 transition-colors hover:bg-muted" data-testid={`${testIdPrefix}-${method.id}`}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary"><ContactMethodIcon platform={method.platform} /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{method.label}</strong><span className="mt-1 block truncate text-sm text-muted-foreground group-hover:text-foreground">{method.value}</span></span><ExternalLink size={14} className="ml-auto shrink-0 text-muted-foreground" /></a>;
+}
+
+function InquireModal({ productName, methods, onClose }: { productName: string; methods: ContactMethodLike[]; onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return <div className="fixed inset-0 z-50 overflow-y-auto bg-primary/40 p-4 backdrop-blur-sm" onClick={onClose} data-testid="inquire-modal-backdrop"><div role="dialog" aria-modal="true" aria-labelledby="inquire-modal-title" className="m-auto w-full max-w-md rounded-3xl bg-card p-6 shadow-2xl md:p-8" onClick={(e) => e.stopPropagation()}><div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Interested in this piece?</p><h2 id="inquire-modal-title" className="display-font mt-2 break-words text-4xl">{productName}</h2></div><button onClick={onClose} aria-label="Close inquiry options" autoFocus className="rounded-full p-2 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" data-testid="button-close-inquire-modal"><X size={19} /></button></div><p className="mt-4 text-sm leading-6 text-muted-foreground">Choose how you&apos;d like to reach Granny Meour.</p>{methods.length ? <div className="mt-6 grid gap-3 sm:grid-cols-2">{methods.map((m) => <ContactMethodCard key={m.id} method={m} productName={productName} testIdPrefix="link-inquire" />)}</div> : <p className="mt-6 rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">No contact options are available right now. Please check back soon.</p>}<div className="mt-6 flex justify-end"><Button variant="outline" onClick={onClose} data-testid="button-close-inquire-modal-footer">Close</Button></div></div></div>;
+}
+
+function ContactOptionsGrid({ methods, testIdPrefix }: { methods: ContactMethodLike[]; testIdPrefix: string }) {
+  if (!methods.length) {
+    return <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">No contact options are available right now. Please check back soon.</p>;
+  }
+  return <div className="grid gap-4 sm:grid-cols-2">{methods.map((m) => <ContactMethodCard key={m.id} method={m} testIdPrefix={testIdPrefix} />)}</div>;
+}
+
 function ProductDetail() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const { data, isLoading, isError } = useGetProduct(id, { query: { enabled: !!id, queryKey: getGetProductQueryKey(id) } });
   const product = (data as ProductLike | undefined);
   const [active, setActive] = useState(0);
+  const [showInquireModal, setShowInquireModal] = useState(false);
+  const { data: settingsData } = useGetSettings();
+  const settings = (settingsData as SettingsLike | undefined) || fallbackSettings;
+  const methods = settings.contactMethods.filter((m) => m.enabled && m.value.trim());
   if (isLoading) return <PublicShell><div className="mx-auto max-w-7xl px-5 py-20"><State kind="loading" /></div></PublicShell>;
   if (isError || !product) return <PublicShell><div className="mx-auto max-w-7xl px-5 py-20"><State kind="error" message="We could not find that piece." /></div></PublicShell>;
   const images = [product.image, ...(product.additionalImages || [])].filter(Boolean);
-  return <PublicShell><section className="mx-auto max-w-7xl px-5 pb-24 pt-10 lg:px-10"><Link href="/products" className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground" data-testid="link-back-products"><ChevronLeft size={16} /> Back to the collection</Link><div className="grid gap-10 md:grid-cols-[1.05fr_.95fr] md:gap-16"><div><div className="aspect-[4/5] overflow-hidden rounded-[2rem] bg-muted"><img src={images[active] || imageFor(product, product.id)} alt={product.name} className="h-full w-full object-cover" data-testid={`img-detail-${product.id}`} /></div>{images.length > 1 && <div className="mt-3 grid grid-cols-4 gap-3">{images.map((src, i) => <button key={src} onClick={() => setActive(i)} className={`aspect-square overflow-hidden rounded-xl border-2 ${active === i ? 'border-accent' : 'border-transparent'}`} data-testid={`button-thumbnail-${i}`}><img src={src} alt="" className="h-full w-full object-cover" /></button>)}</div>}</div><div className="flex flex-col justify-center"><p className="eyebrow">{product.category}</p><h1 className="display-font mt-3 text-5xl leading-[.98] md:text-6xl" data-testid={`text-product-name-${product.id}`}>{product.name}</h1><p className="mt-5 text-2xl font-semibold">{money(product.price)}</p><p className="mt-7 max-w-lg text-base leading-8 text-muted-foreground">{product.description}</p><div className="my-8 border-y border-border py-6"><div className="grid gap-5 sm:grid-cols-2"><div><p className="mono-label text-muted-foreground">Colours</p><p className="mt-2 text-sm">{product.colors?.join(' · ') || 'Chosen with care'}</p></div><div><p className="mono-label text-muted-foreground">Options</p><p className="mt-2 text-sm">{product.variants?.join(' · ') || 'One of a kind'}</p></div></div></div><div className="rounded-2xl bg-secondary p-5"><div className="flex gap-3"><MessageCircle className="mt-1 shrink-0" size={19} /><div><p className="font-semibold">Interested in this one?</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Send a note and I will let you know what is possible, including colour or size questions.</p><Link href="/contact" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold" data-testid="link-inquire-product">Inquire about {product.name} <ArrowRight size={15} /></Link></div></div></div></div></div></section></PublicShell>;
+  return <PublicShell><section className="mx-auto max-w-7xl px-5 pb-24 pt-10 lg:px-10"><Link href="/products" className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground" data-testid="link-back-products"><ChevronLeft size={16} /> Back to the collection</Link><div className="grid gap-10 md:grid-cols-[1.05fr_.95fr] md:gap-16"><div><div className="aspect-[4/5] overflow-hidden rounded-[2rem] bg-muted"><img src={images[active] || imageFor(product, product.id)} alt={product.name} className="h-full w-full object-cover" data-testid={`img-detail-${product.id}`} /></div>{images.length > 1 && <div className="mt-3 grid grid-cols-4 gap-3">{images.map((src, i) => <button key={src} onClick={() => setActive(i)} className={`aspect-square overflow-hidden rounded-xl border-2 ${active === i ? 'border-accent' : 'border-transparent'}`} data-testid={`button-thumbnail-${i}`}><img src={src} alt="" className="h-full w-full object-cover" /></button>)}</div>}</div><div className="flex flex-col justify-center"><p className="eyebrow">{product.category}</p><h1 className="display-font mt-3 text-5xl leading-[.98] md:text-6xl" data-testid={`text-product-name-${product.id}`}>{product.name}</h1><p className="mt-5 text-2xl font-semibold">{money(product.price)}</p><p className="mt-7 max-w-lg text-base leading-8 text-muted-foreground">{product.description}</p><div className="my-8 border-y border-border py-6"><div className="grid gap-5 sm:grid-cols-2"><div><p className="mono-label text-muted-foreground">Colours</p><p className="mt-2 text-sm">{product.colors?.join(' · ') || 'Chosen with care'}</p></div><div><p className="mono-label text-muted-foreground">Options</p><p className="mt-2 text-sm">{product.variants?.join(' · ') || 'One of a kind'}</p></div></div></div><div className="rounded-2xl bg-secondary p-5"><div className="flex gap-3"><MessageCircle className="mt-1 shrink-0" size={19} /><div><p className="font-semibold">Interested in this one?</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Choose how you&apos;d like to reach Granny Meour about colours, sizes, or availability.</p><Button onClick={() => setShowInquireModal(true)} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold" data-testid="button-inquire-product">Inquire <ArrowRight size={15} /></Button></div></div></div></div></div></section>{showInquireModal && <InquireModal productName={product.name} methods={methods} onClose={() => setShowInquireModal(false)} />}</PublicShell>;
 }
-
 function About() {
   const { data } = useGetSettings();
   const settings = (data as SettingsLike | undefined) || fallbackSettings;
@@ -174,40 +230,10 @@ function About() {
 function Contact() {
   const { data } = useGetSettings();
   const settings = (data as SettingsLike | undefined) || fallbackSettings;
-  const [sent, setSent] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState('');
-  const [company, setCompany] = useState('');
+  const methods = settings.contactMethods.filter((m) => m.enabled && m.value.trim());
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setSending(true);
-    setSendError(null);
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, message, company }),
-      });
-      const data = await res.json().catch(() => ({ error: 'Something went sideways while sending.' }));
-      if (!res.ok || data?.sent !== true) {
-        throw new Error(data?.error || 'Something went sideways while sending.');
-      }
-      setSent(true);
-    } catch (err) {
-      setSendError(err instanceof Error && err.message ? err.message : 'Something went sideways while sending.');
-    } finally {
-      setSending(false);
-    }
-  }
-
-  const methods = settings.contactMethods.filter((m) => m.enabled);
-  return <PublicShell><section className="mx-auto max-w-7xl px-5 pb-24 pt-16 lg:px-10"><div className="grid gap-12 md:grid-cols-[.8fr_1.2fr] md:gap-24"><div><p className="eyebrow">Come say hello</p><h1 className="display-font mt-4 text-6xl leading-[.94] md:text-8xl">Let's make a little room for good things.</h1><p className="mt-7 max-w-sm leading-7 text-muted-foreground">Have a question about a piece, a colour in mind, or a gift to figure out? I would love to hear the thought behind it.</p><div className="mt-10 grid gap-5">{methods.map((m) => <a href={m.platform === 'email' ? `mailto:${m.value}` : m.platform === 'phone' ? `tel:${m.value.replace(/\s/g, '')}` : m.value.startsWith('http') ? m.value : m.platform === 'facebook' ? `https://facebook.com/${m.value.replace('@', '')}` : `https://instagram.com/${m.value.replace('@', '')}`} target={m.platform === 'phone' ? undefined : '_blank'} rel="noreferrer" key={m.id} className="group flex items-start gap-4" data-testid={`link-contact-${m.id}`}><span className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary">{m.platform === 'email' ? <Mail size={17} /> : m.platform === 'facebook' ? <Facebook size={17} /> : m.platform === 'phone' ? <MessageCircle size={17} /> : <Instagram size={17} />}</span><span><strong className="block text-sm">{m.label}</strong><span className="mt-1 block text-sm text-muted-foreground group-hover:text-foreground">{m.value}</span></span><ExternalLink size={14} className="ml-auto mt-1 text-muted-foreground" /></a>)}</div></div><div className="rounded-[2rem] bg-card p-6 shadow-sm md:p-10">{sent ? <div className="flex min-h-[440px] flex-col items-center justify-center text-center"><span className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary"><CircleCheck size={28} /></span><h2 className="display-font mt-6 text-4xl">Thanks for reaching out.</h2><p className="mt-3 max-w-sm leading-7 text-muted-foreground">Your note has been sent. I read everything personally and will reply soon.</p><Button variant="outline" onClick={() => { setSent(false); setName(''); setEmail(''); setMessage(''); }} className="mt-7" data-testid="button-send-another">Send another note</Button></div> : <form onSubmit={submit} className="space-y-5"><div><label className="mono-label text-muted-foreground">Your name</label><input required className="site-input mt-2" placeholder="What should I call you?" value={name} onChange={(e) => setName(e.target.value)} data-testid="input-contact-name" /></div><div><label className="mono-label text-muted-foreground">Your email</label><input required type="email" className="site-input mt-2" placeholder="hello@example.com" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="input-contact-email" /></div><div><label className="mono-label text-muted-foreground">What is on your mind?</label><textarea required rows={6} className="site-input mt-2 resize-none" placeholder="Tell me about the piece, the person, or the colour..." value={message} onChange={(e) => setMessage(e.target.value)} data-testid="textarea-contact-message" /></div><input type="text" name="company" value={company} onChange={(e) => setCompany(e.target.value)} className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true" data-testid="input-contact-honeypot" />{sendError && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive" data-testid="text-contact-error">{sendError}</p>}<Button type="submit" disabled={sending} className="w-full" data-testid="button-submit-contact">{sending && <Loader2 className="animate-spin" size={16} />} {sending ? 'Sending…' : 'Send your note'} <ArrowRight size={16} /></Button><p className="text-center text-xs text-muted-foreground">No mailing list. No automated replies. Just a real response.</p></form>}</div></div></section></PublicShell>;
+  return <PublicShell><section className="mx-auto max-w-7xl px-5 pb-24 pt-16 lg:px-10"><div className="max-w-2xl"><p className="eyebrow">Get in touch</p><h1 className="display-font mt-4 text-5xl leading-none md:text-7xl">Let&apos;s make something together.</h1><p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">Have a question about a piece, custom order, or availability? Reach out to Granny Meour directly.</p></div><div className="mt-10 max-w-3xl"><ContactOptionsGrid methods={methods} testIdPrefix="link-contact" /></div></section></PublicShell>;
 }
-
 function AdminLogin() {
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
   const { isLoaded, isSignedIn } = useAuth();
