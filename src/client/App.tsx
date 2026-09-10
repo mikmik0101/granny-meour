@@ -5,7 +5,7 @@ import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { upload as blobUpload } from '@vercel/blob/client';
 import {
-  ArrowRight, Check, ChevronDown, ChevronLeft, CircleAlert, CircleCheck, Copy, Edit3, ExternalLink,
+  ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Copy, Edit3, ExternalLink,
   Eye, EyeOff, Facebook, Heart, Instagram, LayoutDashboard, Leaf, Loader2, Mail, Menu,
   MessageCircle, Package, Pencil, Phone, Plus, Search, Settings, ShoppingBag, Sparkles, Tag,
   Trash2, Waves, X, type LucideIcon,
@@ -242,12 +242,21 @@ function ContactOptionsGrid({ methods, testIdPrefix }: { methods: ContactMethodL
   return <div className="grid gap-4 sm:grid-cols-2">{methods.map((m) => <ContactMethodCard key={m.id} method={m} testIdPrefix={testIdPrefix} />)}</div>;
 }
 
+function ProductGallery({ images, fallbackSrc, productName, productId }: { images: string[]; fallbackSrc: string; productName: string; productId: number }) {
+  const slides = images.length ? images : [fallbackSrc];
+  const total = slides.length;
+  const [index, setIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  useEffect(() => { setIndex(0); }, [productId]);
+  function go(delta: number) { if (total > 1) setIndex((i) => (i + delta + total) % total); }
+  return <div><div role="region" aria-roledescription="carousel" aria-label={`${productName} photos`} tabIndex={total > 1 ? 0 : undefined} onKeyDown={(e) => { if (e.key === 'ArrowRight') go(1); else if (e.key === 'ArrowLeft') go(-1); }} onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }} onTouchEnd={(e) => { if (touchStartX.current === null) return; const dx = e.changedTouches[0].clientX - touchStartX.current; touchStartX.current = null; if (total < 2 || Math.abs(dx) < 40) return; go(dx < 0 ? 1 : -1); }} className="relative touch-pan-y select-none overflow-hidden rounded-[2rem] bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"><div className="flex transition-transform duration-300 ease-out" style={{ transform: `translateX(-${index * 100}%)` }}>{slides.map((slideSrc, i) => <div key={`${productId}-${i}`} className="aspect-[4/5] w-full shrink-0" aria-hidden={i !== index}><img src={slideSrc} alt={images.length ? `${productName} — photo ${i + 1} of ${total}` : productName} draggable={false} className="h-full w-full object-cover" data-testid={i === index ? `img-detail-${productId}` : undefined} /></div>)}</div>{total > 1 && <span aria-hidden className="absolute right-3 top-3 rounded-full bg-card/90 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">{index + 1} / {total}</span>}{total > 1 && <><button type="button" onClick={() => go(-1)} aria-label="Previous photo" className="absolute left-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-card/90 backdrop-blur transition hover:bg-card md:flex"><ChevronLeft size={18} /></button><button type="button" onClick={() => go(1)} aria-label="Next photo" className="absolute right-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-card/90 backdrop-blur transition hover:bg-card md:flex"><ChevronRight size={18} /></button></>}</div>{total > 1 && <><div className="mt-3 flex justify-center gap-2 md:hidden">{slides.map((_, i) => <button key={i} type="button" onClick={() => setIndex(i)} aria-label={`View photo ${i + 1}`} aria-current={i === index} className={`h-2 rounded-full transition-all ${i === index ? 'w-6 bg-primary' : 'w-2 bg-border'}`} />)}</div><div className="mt-3 hidden grid-cols-4 gap-3 md:grid">{slides.map((slideSrc, i) => <button key={`t-${i}`} type="button" onClick={() => setIndex(i)} aria-label={`View photo ${i + 1}`} aria-pressed={i === index} className={`aspect-square overflow-hidden rounded-xl border-2 ${i === index ? 'border-accent' : 'border-transparent'}`} data-testid={`button-thumbnail-${i}`}><img src={slideSrc} alt="" draggable={false} className="h-full w-full object-cover" /></button>)}</div></>}</div>;
+}
+
 function ProductDetail() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const { data, isLoading, isError } = useGetProduct(id, { query: { enabled: !!id, queryKey: getGetProductQueryKey(id) } });
   const product = (data as ProductLike | undefined);
-  const [active, setActive] = useState(0);
   const [showInquireModal, setShowInquireModal] = useState(false);
   const { data: settingsData } = useGetSettings();
   const settings = (settingsData as SettingsLike | undefined) || fallbackSettings;
@@ -255,7 +264,7 @@ function ProductDetail() {
   if (isLoading) return <PublicShell><div className="mx-auto max-w-7xl px-5 py-20"><State kind="loading" /></div></PublicShell>;
   if (isError || !product) return <PublicShell><div className="mx-auto max-w-7xl px-5 py-20"><State kind="error" message="We could not find that piece." /></div></PublicShell>;
   const images = [product.image, ...(product.additionalImages || [])].filter(Boolean);
-  return <PublicShell><section className="mx-auto max-w-7xl px-5 pb-24 pt-10 lg:px-10"><Link href="/products" className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground" data-testid="link-back-products"><ChevronLeft size={16} /> Back to the collection</Link><div className="grid gap-10 md:grid-cols-[1.05fr_.95fr] md:gap-16"><div><div className="aspect-[4/5] overflow-hidden rounded-[2rem] bg-muted"><img src={images[active] || imageFor(product, product.id)} alt={product.name} className="h-full w-full object-cover" data-testid={`img-detail-${product.id}`} /></div>{images.length > 1 && <div className="mt-3 grid grid-cols-4 gap-3">{images.map((src, i) => <button key={src} onClick={() => setActive(i)} className={`aspect-square overflow-hidden rounded-xl border-2 ${active === i ? 'border-accent' : 'border-transparent'}`} data-testid={`button-thumbnail-${i}`}><img src={src} alt="" className="h-full w-full object-cover" /></button>)}</div>}</div><div className="flex flex-col justify-center"><p className="eyebrow">{product.category}</p><h1 className="display-font mt-3 text-5xl leading-[.98] md:text-6xl" data-testid={`text-product-name-${product.id}`}>{product.name}</h1><p className="mt-5 text-2xl font-semibold">{money(product.price)}</p><p className="mt-7 max-w-lg text-base leading-8 text-muted-foreground">{product.description}</p><div className="my-8 border-y border-border py-6"><div className="grid gap-5 sm:grid-cols-2"><div><p className="mono-label text-muted-foreground">Colours</p><p className="mt-2 text-sm">{product.colors?.join(' · ') || 'Chosen with care'}</p></div><div><p className="mono-label text-muted-foreground">Options</p><p className="mt-2 text-sm">{product.variants?.join(' · ') || 'One of a kind'}</p></div></div></div><div className="rounded-2xl bg-secondary p-5"><div className="flex gap-3"><MessageCircle className="mt-1 shrink-0" size={19} /><div><p className="font-semibold">Interested in this one?</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Choose how you&apos;d like to reach Granny Meour about colours, sizes, or availability.</p><Button onClick={() => setShowInquireModal(true)} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold" data-testid="button-inquire-product">Inquire <ArrowRight size={15} /></Button></div></div></div></div></div></section>{showInquireModal && <InquireModal productName={product.name} methods={methods} onClose={() => setShowInquireModal(false)} />}</PublicShell>;
+  return <PublicShell><section className="mx-auto max-w-7xl px-5 pb-24 pt-10 lg:px-10"><Link href="/products" className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground" data-testid="link-back-products"><ChevronLeft size={16} /> Back to the collection</Link><div className="grid gap-10 md:grid-cols-[1.05fr_.95fr] md:gap-16"><div><ProductGallery images={images} fallbackSrc={imageFor(product, product.id)} productName={product.name} productId={product.id} /></div><div className="flex flex-col justify-center"><p className="eyebrow">{product.category}</p><h1 className="display-font mt-3 text-5xl leading-[.98] md:text-6xl" data-testid={`text-product-name-${product.id}`}>{product.name}</h1><p className="mt-5 text-2xl font-semibold">{money(product.price)}</p><p className="mt-7 max-w-lg text-base leading-8 text-muted-foreground">{product.description}</p><div className="my-8 border-y border-border py-6"><div className="grid gap-5 sm:grid-cols-2"><div><p className="mono-label text-muted-foreground">Colours</p><p className="mt-2 text-sm">{product.colors?.join(' · ') || 'Chosen with care'}</p></div><div><p className="mono-label text-muted-foreground">Options</p><p className="mt-2 text-sm">{product.variants?.join(' · ') || 'One of a kind'}</p></div></div></div><div className="rounded-2xl bg-secondary p-5"><div className="flex gap-3"><MessageCircle className="mt-1 shrink-0" size={19} /><div><p className="font-semibold">Interested in this one?</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Choose how you&apos;d like to reach Granny Meour about colours, sizes, or availability.</p><Button onClick={() => setShowInquireModal(true)} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold" data-testid="button-inquire-product">Inquire <ArrowRight size={15} /></Button></div></div></div></div></div></section>{showInquireModal && <InquireModal productName={product.name} methods={methods} onClose={() => setShowInquireModal(false)} />}</PublicShell>;
 }
 function About() {
   const { data } = useGetSettings();
@@ -328,12 +337,67 @@ function ProductForm({ initial, onDone, onCancel }: { initial?: ProductLike; onD
   const qc = useQueryClient();
   const [form, setForm] = useState({ name: initial?.name || '', description: initial?.description || '', price: String(initial?.price || ''), category: initial?.category || '', image: initial?.image || '', status: initial?.status || 'available', featured: initial?.featured || false, colors: initial?.colors?.join(', ') || '', variants: initial?.variants?.join(', ') || '', notes: initial?.notes || '' });
   const [imageFile, setImageFile] = useState<File | undefined>();
+  const [savedExtras, setSavedExtras] = useState<string[]>(initial?.additionalImages ?? []);
+  const [newExtras, setNewExtras] = useState<Array<{ id: number; file: File; preview: string }>>([]);
+  const extraId = useRef(0);
+  const extraPreviews = useRef<string[]>([]);
+  useEffect(() => () => { extraPreviews.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
   const [uploading, setUploading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const busy = create.isPending || update.isPending || uploading;
   function field(key: string, value: string | boolean) { setForm((old) => ({ ...old, [key]: value })); }
   function toErrorMessage(err: unknown, fallback: string) {
     return err instanceof Error && err.message ? err.message : fallback;
+  }
+  function removeSavedExtra(url: string) { setSavedExtras((old) => old.filter((u) => u !== url)); }
+  function moveSavedExtra(index: number, dir: -1 | 1) {
+    setSavedExtras((old) => {
+      const next = [...old];
+      const j = index + dir;
+      if (j < 0 || j >= next.length) return old;
+      const tmp = next[index];
+      next[index] = next[j];
+      next[j] = tmp;
+      return next;
+    });
+  }
+  function makeCover(url: string) {
+    setForm((old) => ({ ...old, image: url }));
+    setSavedExtras((old) => old.filter((u) => u !== url));
+  }
+  function removeNewExtra(id: number) {
+    setNewExtras((old) => {
+      const gone = old.find((item) => item.id === id);
+      if (gone) {
+        URL.revokeObjectURL(gone.preview);
+        extraPreviews.current = extraPreviews.current.filter((u) => u !== gone.preview);
+      }
+      return old.filter((item) => item.id !== id);
+    });
+  }
+  function addExtraFiles(files: FileList | null) {
+    if (!files || !files.length) return;
+    const picked = Array.from(files);
+    for (const f of picked) {
+      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(f.type)) {
+        setSubmitError(`Unsupported file type: ${f.name}. Allowed: JPG, PNG, WebP, GIF.`);
+        return;
+      }
+      if (f.size > 10 * 1024 * 1024) {
+        setSubmitError(`File too large: ${f.name}. Maximum: 10 MB each.`);
+        return;
+      }
+    }
+    setSubmitError(null);
+    setNewExtras((old) => {
+      const items = picked.map((file) => {
+        extraId.current += 1;
+        const preview = URL.createObjectURL(file);
+        extraPreviews.current.push(preview);
+        return { id: extraId.current, file, preview };
+      });
+      return [...old, ...items];
+    });
   }
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -366,11 +430,31 @@ function ProductForm({ initial, onDone, onCancel }: { initial?: ProductLike; onD
         setUploading(false);
       }
     }
-    const body = { name: form.name, description: form.description, price: Number(form.price), category: form.category, image: image || '', status: form.status as 'available' | 'sold-out' | 'coming-soon' | 'hidden', featured: form.featured, colors: form.colors.split(',').map((x) => x.trim()).filter(Boolean), variants: form.variants.split(',').map((x) => x.trim()).filter(Boolean), notes: form.notes || null };
+    const extras: string[] = [...savedExtras];
+    if (newExtras.length) {
+      setUploading(true);
+      try {
+        for (const item of newExtras) {
+          const extraExt = item.file.name.split('.').pop()?.replace(/[^a-z0-9]/gi, '') || 'jpg';
+          const uploaded = await blobUpload(`crochet-boutique/products/product-extra-${Date.now()}-${item.id}.${extraExt}`, item.file, {
+            access: 'public',
+            handleUploadUrl: '/api/storage/upload',
+            contentType: item.file.type,
+          });
+          extras.push(uploaded.url);
+        }
+      } catch (err) {
+        setSubmitError(toErrorMessage(err, 'Could not upload the additional photos. Please try again.'));
+        return;
+      } finally {
+        setUploading(false);
+      }
+    }
+    const body = { name: form.name, description: form.description, price: Number(form.price), category: form.category, image: image || '', additionalImages: extras, status: form.status as 'available' | 'sold-out' | 'coming-soon' | 'hidden', featured: form.featured, colors: form.colors.split(',').map((x) => x.trim()).filter(Boolean), variants: form.variants.split(',').map((x) => x.trim()).filter(Boolean), notes: form.notes || null };
     const options = { onSuccess: () => { qc.invalidateQueries({ queryKey: getListProductsQueryKey() }); onDone(); }, onError: (err: unknown) => { setSubmitError(toErrorMessage(err, 'Could not save the product. Please try again.')); } };
     if (initial) update.mutate({ id: initial.id, data: body }, options); else create.mutate({ data: body }, options);
   }
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4 backdrop-blur-sm"><form onSubmit={submit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-card p-6 shadow-2xl md:p-8"><div className="flex items-start justify-between"><div><p className="eyebrow">{initial ? 'Edit a piece' : 'Add to the shelf'}</p><h2 className="display-font mt-2 text-4xl">{initial ? initial.name : 'New product'}</h2></div><button type="button" onClick={onCancel} className="rounded-full p-2 hover:bg-muted" data-testid="button-close-product-form"><X size={19} /></button></div><div className="mt-7 grid gap-4 md:grid-cols-2"><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Name</span><input required value={form.name} onChange={(e) => field('name', e.target.value)} className="admin-input mt-2" data-testid="input-product-name" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Description</span><textarea required rows={3} value={form.description} onChange={(e) => field('description', e.target.value)} className="admin-input mt-2 resize-none" data-testid="textarea-product-description" /></label><label><span className="mono-label text-muted-foreground">Price</span><input required type="number" min="0" value={form.price} onChange={(e) => field('price', e.target.value)} className="admin-input mt-2" data-testid="input-product-price" /></label><label><span className="mono-label text-muted-foreground">Category</span><input required value={form.category} onChange={(e) => field('category', e.target.value)} className="admin-input mt-2" data-testid="input-product-category" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Product photo</span><input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0])} className="admin-input mt-2" data-testid="input-product-image" /><p className="mt-1 text-xs text-muted-foreground">{imageFile ? imageFile.name : initial?.image ? 'A photo is already attached. Choose a new one to replace it.' : 'Upload a JPG, PNG, or WebP image.'}</p></label><label><span className="mono-label text-muted-foreground">Status</span><select value={form.status} onChange={(e) => field('status', e.target.value)} className="admin-input mt-2" data-testid="select-product-status"><option value="available">Available</option><option value="coming-soon">Coming soon</option><option value="sold-out">Sold out</option><option value="hidden">Hidden</option></select></label><label className="flex items-end pb-3"><span className="flex items-center gap-3 text-sm"><input type="checkbox" checked={form.featured} onChange={(e) => field('featured', e.target.checked)} className="h-4 w-4 accent-[hsl(var(--primary))]" data-testid="checkbox-product-featured" /> Feature this piece</span></label><label><span className="mono-label text-muted-foreground">Colours</span><input value={form.colors} onChange={(e) => field('colors', e.target.value)} className="admin-input mt-2" placeholder="Sage, Oat" data-testid="input-product-colors" /></label><label><span className="mono-label text-muted-foreground">Variants</span><input value={form.variants} onChange={(e) => field('variants', e.target.value)} className="admin-input mt-2" placeholder="One size" data-testid="input-product-variants" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Private notes</span><input value={form.notes} onChange={(e) => field('notes', e.target.value)} className="admin-input mt-2" data-testid="input-product-notes" /></label></div>{submitError && <p role="alert" className="mt-6 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive" data-testid="text-product-form-error">{submitError}</p>}<div className="mt-8 flex justify-end gap-3"><Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel-product">Cancel</Button><Button type="submit" disabled={busy} data-testid="button-save-product">{busy && <Loader2 className="animate-spin" size={16} />}{uploading ? 'Uploading photo…' : initial ? 'Save changes' : 'Add product'}</Button></div></form></div>;
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4 backdrop-blur-sm"><form onSubmit={submit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-card p-6 shadow-2xl md:p-8"><div className="flex items-start justify-between"><div><p className="eyebrow">{initial ? 'Edit a piece' : 'Add to the shelf'}</p><h2 className="display-font mt-2 text-4xl">{initial ? initial.name : 'New product'}</h2></div><button type="button" onClick={onCancel} className="rounded-full p-2 hover:bg-muted" data-testid="button-close-product-form"><X size={19} /></button></div><div className="mt-7 grid gap-4 md:grid-cols-2"><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Name</span><input required value={form.name} onChange={(e) => field('name', e.target.value)} className="admin-input mt-2" data-testid="input-product-name" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Description</span><textarea required rows={3} value={form.description} onChange={(e) => field('description', e.target.value)} className="admin-input mt-2 resize-none" data-testid="textarea-product-description" /></label><label><span className="mono-label text-muted-foreground">Price</span><input required type="number" min="0" value={form.price} onChange={(e) => field('price', e.target.value)} className="admin-input mt-2" data-testid="input-product-price" /></label><label><span className="mono-label text-muted-foreground">Category</span><input required value={form.category} onChange={(e) => field('category', e.target.value)} className="admin-input mt-2" data-testid="input-product-category" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Product photo</span><input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0])} className="admin-input mt-2" data-testid="input-product-image" /><p className="mt-1 text-xs text-muted-foreground">{imageFile ? imageFile.name : initial?.image ? 'A photo is already attached. Choose a new one to replace it.' : 'Upload a JPG, PNG, or WebP image.'}</p>{form.image && !imageFile ? <img src={form.image} alt="Current cover photo" className="mt-3 h-16 w-16 rounded-xl object-cover" data-testid="img-product-cover-preview" /> : null}</label><div className="md:col-span-2"><span className="mono-label text-muted-foreground">Additional photos</span>{savedExtras.length > 0 && <div className="mt-3 grid grid-cols-3 gap-3">{savedExtras.map((extraUrl, i) => <div key={extraUrl} className="overflow-hidden rounded-xl border border-border"><img src={extraUrl} alt={`Additional photo ${i + 1}`} className="aspect-square w-full object-cover" /><div className="flex items-center justify-center gap-1 p-1.5"><button type="button" onClick={() => moveSavedExtra(i, -1)} disabled={i === 0} aria-label={`Move photo ${i + 1} left`} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"><ChevronLeft size={15} /></button><button type="button" onClick={() => moveSavedExtra(i, 1)} disabled={i === savedExtras.length - 1} aria-label={`Move photo ${i + 1} right`} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"><ChevronRight size={15} /></button><button type="button" onClick={() => makeCover(extraUrl)} aria-label={`Use photo ${i + 1} as cover`} className="rounded-md px-1.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground">Cover</button><button type="button" onClick={() => removeSavedExtra(extraUrl)} aria-label={`Remove photo ${i + 1}`} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"><X size={15} /></button></div></div>)}</div>}{newExtras.length > 0 && <div className="mt-3 grid grid-cols-3 gap-3">{newExtras.map((item) => <div key={item.id} className="relative overflow-hidden rounded-xl border border-border"><img src={item.preview} alt={item.file.name} className="aspect-square w-full object-cover" /><button type="button" onClick={() => removeNewExtra(item.id)} aria-label={`Remove ${item.file.name}`} className="absolute right-1 top-1 rounded-full bg-card/90 p-1 text-muted-foreground hover:bg-card hover:text-destructive"><X size={14} /></button></div>)}</div>}<label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground hover:bg-muted"><Plus size={15} /> Add more photos<input type="file" accept="image/*" multiple onChange={(e) => { addExtraFiles(e.target.files); e.target.value = ''; }} className="hidden" data-testid="input-product-extra-images" /></label><p className="mt-1 text-xs text-muted-foreground">JPG, PNG, WebP or GIF, up to 10 MB each. Order is kept as shown.</p></div><label><span className="mono-label text-muted-foreground">Status</span><select value={form.status} onChange={(e) => field('status', e.target.value)} className="admin-input mt-2" data-testid="select-product-status"><option value="available">Available</option><option value="coming-soon">Coming soon</option><option value="sold-out">Sold out</option><option value="hidden">Hidden</option></select></label><label className="flex items-end pb-3"><span className="flex items-center gap-3 text-sm"><input type="checkbox" checked={form.featured} onChange={(e) => field('featured', e.target.checked)} className="h-4 w-4 accent-[hsl(var(--primary))]" data-testid="checkbox-product-featured" /> Feature this piece</span></label><label><span className="mono-label text-muted-foreground">Colours</span><input value={form.colors} onChange={(e) => field('colors', e.target.value)} className="admin-input mt-2" placeholder="Sage, Oat" data-testid="input-product-colors" /></label><label><span className="mono-label text-muted-foreground">Variants</span><input value={form.variants} onChange={(e) => field('variants', e.target.value)} className="admin-input mt-2" placeholder="One size" data-testid="input-product-variants" /></label><label className="md:col-span-2"><span className="mono-label text-muted-foreground">Private notes</span><input value={form.notes} onChange={(e) => field('notes', e.target.value)} className="admin-input mt-2" data-testid="input-product-notes" /></label></div>{submitError && <p role="alert" className="mt-6 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive" data-testid="text-product-form-error">{submitError}</p>}<div className="mt-8 flex justify-end gap-3"><Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel-product">Cancel</Button><Button type="submit" disabled={busy} data-testid="button-save-product">{busy && <Loader2 className="animate-spin" size={16} />}{uploading ? 'Uploading photos…' : initial ? 'Save changes' : 'Add product'}</Button></div></form></div>;
 }
 
 function AdminProducts() {
